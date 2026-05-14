@@ -1,0 +1,113 @@
+name: StudyApp
+options:
+  bundleIdPrefix: co.autopus
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: ko
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  StudyCore:
+    path: StudyCore
+
+targets:
+  StudyApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: StudyApp
+        excludes:
+          - "Info.plist"
+          - "StudyApp.entitlements"
+      - path: Shared
+    info:
+      path: StudyApp/Info.plist
+      properties:
+        CFBundleDisplayName: "SJ"
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiredDeviceCapabilities:
+          - arm64
+        NSSupportsLiveActivities: true
+        ITSAppUsesNonExemptEncryption: false
+        NSHealthShareUsageDescription: "운동 시간과 걸음수를 가져와 순공시간 통계에 반영합니다."
+        NSHealthUpdateUsageDescription: "러닝·운동 기록을 건강 앱에 저장합니다."
+        NSLocationWhenInUseUsageDescription: "러닝 경로와 거리를 측정합니다. 운동 중에만 사용합니다."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "러닝 도중 잠금화면 상태에서도 거리·페이스 측정을 이어가기 위해 위치를 사용합니다."
+        NSMotionUsageDescription: "걸음·페이스 측정에 사용합니다."
+        UIBackgroundModes:
+          - location
+    entitlements:
+      path: StudyApp/StudyApp.entitlements
+      properties:
+        # iCloud entitlement removed for free-tier Apple ID signing — a paid
+        # Apple Developer Program account is required to register an iCloud
+        # container. Add the keys back when graduating to TestFlight.
+        com.apple.security.application-groups:
+          - group.co.autopus.study
+    dependencies:
+      - package: StudyCore
+        product: StudyCore
+      - target: StudyWidgets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.autopus.study
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        # Free Apple ID signing: Xcode picks the cert + provisioning profile
+        # automatically once you select your personal Team in the target's
+        # Signing & Capabilities tab.
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+        # Simulator builds keep sign-skip; device builds require signing.
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": NO
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": ""
+        SWIFT_EMIT_LOC_STRINGS: YES
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        GENERATE_INFOPLIST_FILE: NO
+
+  StudyWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: StudyWidgets
+        excludes:
+          - "Info.plist"
+          - "StudyWidgets.entitlements"
+      - path: Shared
+    dependencies:
+      - package: StudyCore
+        product: StudyCore
+    info:
+      path: StudyWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: "SJ 위젯"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: StudyWidgets/StudyWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.co.autopus.study
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.autopus.study.widgets
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        SKIP_INSTALL: YES
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": NO
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": ""
+        GENERATE_INFOPLIST_FILE: NO

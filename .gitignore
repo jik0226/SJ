@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# Xcode user-specific
+**/xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+
+# Build artifacts
+**/build/
+**/DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# CocoaPods (사용 안 함이지만 안전 차원)
+Pods/
+
+# Carthage (사용 안 함)
+Carthage/Build/
+
+# Xcode debug / runtime
+*.hmap
+*.ipa
+*.xcarchive
+
+# 임시 / 시뮬 캡처 (필요한 것만 별도 커밋 권장)
+# screenshot_*.png
+
+# Misc
+*.log
