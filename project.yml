@@ -10,6 +10,16 @@ options:
 packages:
   StudyCore:
     path: StudyCore
+  # Firebase only. Analytics/Crashlytics/Performance kept off to minimise
+  # binary size and avoid privacy disclosures the app doesn't need yet.
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.0.0"
+  # Google Sign-In: used to upgrade an anon UID to a permanent Google-backed
+  # account. Required when friends want their data to survive phone changes.
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "7.0.0"
 
 targets:
   StudyApp:
@@ -33,6 +43,14 @@ targets:
           - arm64
         NSSupportsLiveActivities: true
         ITSAppUsesNonExemptEncryption: false
+        # Google Sign-In OAuth callback. The value mirrors the
+        # REVERSED_CLIENT_ID key from GoogleService-Info.plist — Firebase
+        # mints both, and this scheme is how the OAuth provider hands
+        # control back to the app after the user signs in.
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - com.googleusercontent.apps.199420155803-ue5uvmo50ok1l5ona2rqbkcr074t75vs
         NSHealthShareUsageDescription: "운동 시간과 걸음수를 가져와 순공시간 통계에 반영합니다."
         NSHealthUpdateUsageDescription: "러닝·운동 기록을 건강 앱에 저장합니다."
         NSLocationWhenInUseUsageDescription: "러닝 경로와 거리를 측정합니다. 운동 중에만 사용합니다."
@@ -48,10 +66,24 @@ targets:
         # container. Add the keys back when graduating to TestFlight.
         com.apple.security.application-groups:
           - group.co.autopus.study
+        # Firebase Auth 11.x stores anon UID tokens in the keychain. Without
+        # an explicit access group iOS 26 simulators reject the write with
+        # "An error occurred when accessing the keychain". The TeamID prefix
+        # is auto-resolved at sign time (simulator uses a synthetic prefix).
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)co.autopus.study
     dependencies:
       - package: StudyCore
         product: StudyCore
       - target: StudyWidgets
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.autopus.study
@@ -67,12 +99,17 @@ targets:
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
-        # Simulator builds keep sign-skip; device builds require signing.
-        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": NO
-        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": ""
+        # Simulator builds need ad-hoc signing so entitlements (notably
+        # keychain-access-groups, required by FirebaseAuth) actually land in
+        # the binary. CODE_SIGNING_ALLOWED=NO produced unsigned binaries
+        # whose entitlement plist was ignored, breaking anon auth.
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": YES
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
         SWIFT_EMIT_LOC_STRINGS: YES
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
   StudyWidgets:
     type: app-extension
@@ -108,6 +145,6 @@ targets:
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
-        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": NO
-        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": ""
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": YES
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
         GENERATE_INFOPLIST_FILE: NO

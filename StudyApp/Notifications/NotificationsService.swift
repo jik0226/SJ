@@ -18,7 +18,7 @@ enum NotificationsService {
         post(
             id: "goal.\(subjectName)",
             title: "오늘 목표 달성! 🎯",
-            body: "\(subjectName) 목표 시간을 채웠어요. 식물에 영양분이 쌓이고 있어요 🌱"
+            body: "\(subjectName) 목표 시간을 채웠어요. 바다에 영양분이 쌓이고 있어요 🌊"
         )
     }
 
@@ -26,7 +26,17 @@ enum NotificationsService {
         post(
             id: "streak.weekly",
             title: "7일 연속 달성! 🔥",
-            body: "보너스 영양분이 식물에 더해졌어요"
+            body: "보너스 영양분이 바다에 더해졌어요"
+        )
+    }
+
+    /// Pomodoro break alert. Posted once each time a work block elapses;
+    /// the timer auto-pauses and the user manually resumes after the break.
+    static func postPomodoroBreak(workMinutes: Int, restMinutes: Int) {
+        post(
+            id: "pomodoro.break.\(UUID().uuidString)",
+            title: "잠깐 쉬어요 ☕️",
+            body: "\(workMinutes)분 집중 완료. \(restMinutes)분 휴식 후 다시 시작해요."
         )
     }
 

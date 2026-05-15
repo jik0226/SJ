@@ -1,164 +1,149 @@
-// PlantCanvasView — draws the plant from PlantParameters using SwiftUI Canvas.
-// Pure math: stem is a sin wave, leaves are rose curves r = a·cos(n·θ),
-// flower is a 6-petal rose. No images.
+// PlantCanvasView — ocean rendering. Renamed conceptually but file path
+// kept for git continuity.
+//
+// Multi-layer sin waves + parametric fish, all from OceanParameters. The
+// `phase` value of each wave gets an additional time-based offset so the
+// surface gently animates without any image asset.
 
 import SwiftUI
 import StudyCore
 
 struct PlantCanvasView: View {
-    let parameters: PlantParameters
-    /// Optional 0..1 ambient phase used to gently sway the plant on screen.
+    let parameters: OceanParameters
+    /// 0..1 ambient phase to push wave + fish positions.
     var sway: Double = 0
 
     var body: some View {
         Canvas { context, size in
-            let p = parameters
-            let baseX = size.width / 2
-            let baseY = size.height - 16
-            // Normalise stemHeight (20..~150) into canvas height budget.
-            let stemPixelHeight = min(size.height * 0.85, p.stemHeight * 2.0)
-
-            // Resolve hues to Colors once.
-            let stemColor = Color(hue: p.stemHue, saturation: 0.55, brightness: 0.55)
-            let leafColor = Color(hue: p.leafHue, saturation: 0.65, brightness: 0.70)
-
-            drawStem(
-                context: context,
-                baseX: baseX, baseY: baseY,
-                height: stemPixelHeight,
-                amplitude: p.stemAmplitude,
-                frequency: p.stemFrequency,
-                color: stemColor,
-                sway: sway
-            )
-            drawLeaves(
-                context: context,
-                baseX: baseX, baseY: baseY,
-                stemHeight: stemPixelHeight,
-                p: p,
-                color: leafColor,
-                sway: sway
-            )
-            if p.hasFlower {
-                let pos = stemPoint(
-                    baseX: baseX, baseY: baseY,
-                    height: stemPixelHeight, t: 1.0,
-                    amplitude: p.stemAmplitude,
-                    frequency: p.stemFrequency,
-                    sway: sway
-                )
-                drawFlower(
-                    context: context,
-                    at: pos,
-                    size: max(p.leafSize, 8) * 1.4,
-                    color: Color(hue: (p.leafHue + 0.55).truncatingRemainder(dividingBy: 1),
-                                 saturation: 0.7, brightness: 0.9)
-                )
-            }
+            drawBackground(context: context, size: size, parameters: parameters)
+            drawWaves(context: context, size: size, parameters: parameters, sway: sway)
+            drawFish(context: context, size: size, parameters: parameters, sway: sway)
         }
     }
 
-    private func stemPoint(
-        baseX: Double, baseY: Double, height: Double, t: Double,
-        amplitude: Double, frequency: Double, sway: Double
-    ) -> CGPoint {
-        let y = baseY - t * height
-        let phase = sway * 2 * .pi
-        let x = baseX + sin(t * frequency * .pi * 2 + phase) * amplitude
-        return CGPoint(x: x, y: y)
-    }
-
-    private func drawStem(
-        context: GraphicsContext,
-        baseX: Double, baseY: Double, height: Double,
-        amplitude: Double, frequency: Double,
-        color: Color, sway: Double
+    private func drawBackground(
+        context: GraphicsContext, size: CGSize, parameters: OceanParameters
     ) {
-        var path = Path()
-        path.move(to: CGPoint(x: baseX, y: baseY))
-        let steps = 60
-        for i in 0...steps {
-            let t = Double(i) / Double(steps)
-            let pt = stemPoint(
-                baseX: baseX, baseY: baseY, height: height, t: t,
-                amplitude: amplitude, frequency: frequency, sway: sway
+        let topColor = Color(hue: parameters.bgHue, saturation: 0.30, brightness: 0.92)
+        let bottomColor = Color(hue: parameters.bgHue, saturation: 0.65, brightness: 0.30)
+        let rect = CGRect(origin: .zero, size: size)
+        context.fill(
+            Path(rect),
+            with: .linearGradient(
+                Gradient(colors: [topColor, bottomColor]),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: 0, y: size.height)
             )
-            path.addLine(to: pt)
-        }
-        context.stroke(
-            path, with: .color(color),
-            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
         )
     }
 
-    private func drawLeaves(
-        context: GraphicsContext,
-        baseX: Double, baseY: Double, stemHeight: Double,
-        p: PlantParameters, color: Color, sway: Double
+    private func drawWaves(
+        context: GraphicsContext, size: CGSize, parameters: OceanParameters, sway: Double
     ) {
-        guard p.leafCount > 0 else { return }
-        for i in 0..<p.leafCount {
-            // Place leaves along the upper 80% of the stem, alternating sides.
-            let t = 0.15 + (Double(i) / Double(max(1, p.leafCount - 1))) * 0.8
-            let pt = stemPoint(
-                baseX: baseX, baseY: baseY, height: stemHeight, t: t,
-                amplitude: p.stemAmplitude, frequency: p.stemFrequency, sway: sway
+        // Each wave lives in a horizontal band — back waves higher up, front
+        // waves lower down. We fill the area beneath each wave with a slightly
+        // darker blue so they read as overlapping sheets.
+        let bandTop = size.height * 0.35   // surface starts ~35% from top
+        let bandBottom = size.height * 0.95
+
+        for wave in parameters.waves {
+            let centerY = bandTop + wave.depth * (bandBottom - bandTop)
+            let hue = parameters.bgHue
+            let saturation = 0.55 + wave.depth * 0.25
+            let brightness = 0.75 - wave.depth * 0.30
+            let color = Color(hue: hue, saturation: saturation, brightness: brightness)
+
+            var path = Path()
+            path.move(to: CGPoint(x: 0, y: size.height))
+            let steps = 80
+            for i in 0...steps {
+                let xRatio = Double(i) / Double(steps)
+                let x = xRatio * size.width
+                let arg = wave.frequency * (xRatio * 10) + wave.phase + sway * 2 * .pi
+                let y = centerY + sin(arg) * wave.amplitude
+                if i == 0 {
+                    path.move(to: CGPoint(x: x, y: y))
+                } else {
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+            }
+            // Close to bottom for filled wave area.
+            path.addLine(to: CGPoint(x: size.width, y: size.height))
+            path.addLine(to: CGPoint(x: 0, y: size.height))
+            path.closeSubpath()
+
+            context.fill(path, with: .color(color.opacity(0.65)))
+        }
+    }
+
+    private func drawFish(
+        context: GraphicsContext, size: CGSize, parameters: OceanParameters, sway: Double
+    ) {
+        for (idx, fish) in parameters.fish.enumerated() {
+            let baseX = fish.xRatio * size.width
+            // Fish gently swim horizontally based on the sway phase + its index.
+            let driftX = sin(sway * 2 * .pi + Double(idx) * 0.7) * 10
+            let center = CGPoint(
+                x: baseX + (fish.facingRight ? driftX : -driftX),
+                y: fish.yRatio * size.height
             )
-            let side: Double = (i % 2 == 0) ? 1.0 : -1.0
-            let seedJitter = Double((p.seed &+ UInt64(i)) % 7) * 0.05  // 0..0.3
-            let angle = side * (.pi / 6 + seedJitter)
-            drawRoseLeaf(
-                context: context,
-                at: pt, angle: angle,
-                petals: p.leafPetals,
-                size: p.leafSize,
-                color: color
+            let body = Color(hue: fish.bodyHue, saturation: 0.65, brightness: 0.85)
+            let radius = fish.sizeRatio * min(size.width, size.height) * 0.45
+            drawSingleFish(
+                context: context, center: center, radius: radius,
+                facingRight: fish.facingRight, color: body
             )
         }
     }
 
-    /// Rose curve r = a·cos(n·θ) drawn as a closed leaf, oriented along `angle`.
-    private func drawRoseLeaf(
-        context: GraphicsContext,
-        at center: CGPoint, angle: Double,
-        petals: Int, size: Double,
-        color: Color
+    /// Parametric fish: body = horizontal ellipse, tail = triangle cusp.
+    private func drawSingleFish(
+        context: GraphicsContext, center: CGPoint, radius: Double,
+        facingRight: Bool, color: Color
     ) {
+        let sign: Double = facingRight ? 1 : -1
+        let bodyWidth = radius * 1.6
+        let bodyHeight = radius
         var path = Path()
+        // Parametric ellipse (body).
         let steps = 36
-        let n = Double(petals)
         for i in 0...steps {
-            let theta = (Double(i) / Double(steps)) * .pi   // half rotation enough for one petal
-            let r = size * abs(cos(n * theta))
-            let lx = r * cos(theta)
-            let ly = r * sin(theta)
-            // Rotate by `angle` then translate.
-            let rx = lx * cos(angle) - ly * sin(angle)
-            let ry = lx * sin(angle) + ly * cos(angle)
-            let pt = CGPoint(x: center.x + rx, y: center.y - ry)
-            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+            let t = Double(i) / Double(steps) * 2 * .pi
+            let x = center.x + cos(t) * bodyWidth
+            let y = center.y + sin(t) * bodyHeight
+            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+            else { path.addLine(to: CGPoint(x: x, y: y)) }
         }
         path.closeSubpath()
-        context.fill(path, with: .color(color.opacity(0.85)))
-        context.stroke(path, with: .color(color), lineWidth: 0.6)
-    }
+        context.fill(path, with: .color(color))
 
-    private func drawFlower(
-        context: GraphicsContext,
-        at center: CGPoint, size: Double, color: Color
-    ) {
-        var path = Path()
-        let steps = 80
-        let n: Double = 3  // 6-petaled rose
-        for i in 0...steps {
-            let theta = (Double(i) / Double(steps)) * 2 * .pi
-            let r = size * cos(n * theta)
-            let pt = CGPoint(
-                x: center.x + r * cos(theta),
-                y: center.y - r * sin(theta)
-            )
-            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
-        }
-        context.fill(path, with: .color(color.opacity(0.9)))
+        // Tail: small triangle at the back.
+        var tail = Path()
+        let tailTip = CGPoint(x: center.x - sign * bodyWidth * 1.6, y: center.y)
+        let tailUp = CGPoint(x: center.x - sign * bodyWidth * 0.9, y: center.y - bodyHeight)
+        let tailDown = CGPoint(x: center.x - sign * bodyWidth * 0.9, y: center.y + bodyHeight)
+        tail.move(to: tailTip)
+        tail.addLine(to: tailUp)
+        tail.addLine(to: tailDown)
+        tail.closeSubpath()
+        context.fill(tail, with: .color(color.opacity(0.85)))
+
+        // Eye.
+        let eyeCenter = CGPoint(x: center.x + sign * bodyWidth * 0.55, y: center.y - bodyHeight * 0.2)
+        let eyeRadius = max(1.5, radius * 0.12)
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: eyeCenter.x - eyeRadius, y: eyeCenter.y - eyeRadius,
+                width: eyeRadius * 2, height: eyeRadius * 2
+            )),
+            with: .color(.white)
+        )
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: eyeCenter.x - eyeRadius * 0.5, y: eyeCenter.y - eyeRadius * 0.5,
+                width: eyeRadius, height: eyeRadius
+            )),
+            with: .color(.black)
+        )
     }
 }

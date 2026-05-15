@@ -35,3 +35,13 @@ Carthage/Build/
 
 # Misc
 *.log
+
+# Firebase client config — each contributor downloads their own plist from
+# the Firebase console (see docs/SIGNING_AND_BACKEND.md). The plist holds
+# the project's discoverable API key, which is OK to commit per Firebase
+# guidance, but we keep it out so forks aren't pinned to one project.
+StudyApp/GoogleService-Info.plist
+
+# SwiftData backup archives created by AppModelContainer when a schema
+# migration fails. Local-only, never relevant in source.
+**/Documents/Backups/

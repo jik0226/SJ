@@ -23,6 +23,12 @@ final class ChatMessageModel {
     /// "anyone has read this" bit so badges work without a full receipts table.
     var anyoneRead: Bool
 
+    /// Outbound delivery state — `sending` while the Firestore publish is
+    /// in-flight, `sent` once it lands, `failed` on permission/network
+    /// errors. Inbound (mirrored) messages are always `.sent`.
+    /// Stored as a raw String so SwiftData migration stays cheap.
+    var deliveryStateRaw: String
+
     init(
         id: UUID = UUID(),
         groupId: UUID,
@@ -32,7 +38,8 @@ final class ChatMessageModel {
         isReported: Bool = false,
         attachedRecordSummary: String? = nil,
         attachedKind: AttachedKind? = nil,
-        anyoneRead: Bool = false
+        anyoneRead: Bool = false,
+        deliveryState: DeliveryState = .sent
     ) {
         self.id = id
         self.groupId = groupId
@@ -43,6 +50,12 @@ final class ChatMessageModel {
         self.attachedRecordSummary = attachedRecordSummary
         self.attachedKindRaw = attachedKind?.rawValue
         self.anyoneRead = anyoneRead
+        self.deliveryStateRaw = deliveryState.rawValue
+    }
+
+    var deliveryState: DeliveryState {
+        get { DeliveryState(rawValue: deliveryStateRaw) ?? .sent }
+        set { deliveryStateRaw = newValue.rawValue }
     }
 
     var attachedKind: AttachedKind? {
@@ -53,4 +66,10 @@ final class ChatMessageModel {
 enum AttachedKind: String, Codable, CaseIterable, Sendable {
     case studySession
     case runSession
+}
+
+enum DeliveryState: String, Codable, CaseIterable, Sendable {
+    case sending
+    case sent
+    case failed
 }

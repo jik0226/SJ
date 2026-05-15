@@ -82,6 +82,12 @@ public final class TimerEngine {
         return current
     }
 
+    /// Convenience: ID of the subject the engine is currently bound to, or
+    /// nil when idle/ended. UI layers (FocusModeView) read this to look up
+    /// the matching SubjectModel by id without having to keep a parallel
+    /// reference around.
+    public var runningSubjectID: UUID? { subject?.id }
+
     /// Seconds the timer was actively counting (start to now, minus pauses).
     public var elapsedSeconds: Int {
         guard let s = session else { return 0 }

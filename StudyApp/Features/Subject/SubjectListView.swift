@@ -38,10 +38,13 @@ struct SubjectListView: View {
     }
 
     private func delete(at offsets: IndexSet) {
+        let removed = offsets.map { subjects[$0].id }
         for i in offsets {
             context.delete(subjects[i])
         }
-        Persistence.save({ try context.save() }, context: "subject.delete")
+        if Persistence.save({ try context.save() }, context: "subject.delete") != nil {
+            removed.forEach(FirestoreSyncService.shared.deleteSubject)
+        }
     }
 }
 
@@ -71,7 +74,10 @@ private struct SubjectRow: View {
     }
 }
 
-private struct SubjectFormView: View {
+/// Internal so the timer hub's empty-state CTA can open the form directly
+/// without bouncing the user through `SubjectListView`. Same component, two
+/// entry points — the list keeps using it as before.
+struct SubjectFormView: View {
     let existing: SubjectModel?
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -84,6 +90,7 @@ private struct SubjectFormView: View {
     @State private var iconName: String = "book"
     @State private var workoutType: WorkoutType = .running
     @State private var hydrated = false
+    @State private var showingDeleteConfirm = false
 
     private static let studyIcons = [
         "book", "function", "character.book.closed", "laptopcomputer",
@@ -168,6 +175,17 @@ private struct SubjectFormView: View {
                 } footer: {
                     Text("강의 모드는 1회 최대 3시간까지 유지됩니다.")
                 }
+                if existing != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            showingDeleteConfirm = true
+                        } label: {
+                            Label("이 과목 삭제", systemImage: "trash")
+                        }
+                    } footer: {
+                        Text("과목을 삭제해도 이미 기록된 학습 세션은 통계에 남습니다.")
+                    }
+                }
             }
             .navigationTitle(existing == nil ? "새 과목" : "과목 편집")
             .toolbar {
@@ -179,7 +197,27 @@ private struct SubjectFormView: View {
                 }
             }
             .onAppear { hydrate() }
+            .confirmationDialog(
+                "이 과목을 삭제할까요?",
+                isPresented: $showingDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("삭제", role: .destructive) { deleteExisting() }
+                Button("취소", role: .cancel) {}
+            } message: {
+                Text("이미 기록된 세션은 통계에 남고, 진행 중인 타이머는 영향을 받지 않습니다.")
+            }
         }
+    }
+
+    private func deleteExisting() {
+        guard let s = existing else { return }
+        let removedId = s.id
+        context.delete(s)
+        if Persistence.save({ try context.save() }, context: "subject.deleteFromForm") != nil {
+            FirestoreSyncService.shared.deleteSubject(removedId)
+        }
+        dismiss()
     }
 
     private func hydrate() {
@@ -210,6 +248,7 @@ private struct SubjectFormView: View {
     private func save() {
         let hex = "#" + String(format: "%06X", colorHexValue())
         let resolvedWorkoutType: WorkoutType? = (category == .workout) ? workoutType : nil
+        let written: SubjectModel
         if let s = existing {
             s.name = name
             s.colorHex = hex
@@ -218,6 +257,7 @@ private struct SubjectFormView: View {
             s.categoryRaw = category.rawValue
             s.dailyTargetMinutes = dailyTargetMinutes
             s.workoutTypeRaw = resolvedWorkoutType?.rawValue
+            written = s
         } else {
             let s = SubjectModel(
                 name: name,
@@ -229,8 +269,11 @@ private struct SubjectFormView: View {
                 workoutType: resolvedWorkoutType
             )
             context.insert(s)
+            written = s
         }
-        Persistence.save({ try context.save() }, context: "subject.save")
+        if Persistence.save({ try context.save() }, context: "subject.save") != nil {
+            FirestoreSyncService.shared.publishSubject(written)
+        }
         dismiss()
     }
 

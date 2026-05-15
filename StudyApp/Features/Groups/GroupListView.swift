@@ -16,10 +16,17 @@ struct GroupListView: View {
 
     @State private var showingCreate = false
     @State private var showingJoin = false
+    @State private var navigateToGroup: StudyGroupModel?
 
     private var myGroups: [StudyGroupModel] {
-        guard let me = mes.first else { return [] }
-        return allGroups.filter { $0.memberCodes.contains(me.friendCode) }
+        let myCodes = Set(mes.filter { $0.isMe }.map(\.friendCode))
+        guard !myCodes.isEmpty else { return [] }
+        return allGroups.filter { group in
+            // DM groups are surfaced from the friends list, not here, so the
+            // group screen stays focused on multi-member study groups.
+            guard !group.code.hasPrefix(SocialService.directMessageCodePrefix) else { return false }
+            return !myCodes.isDisjoint(with: group.memberCodes)
+        }
     }
 
     var body: some View {
@@ -37,10 +44,21 @@ struct GroupListView: View {
                     }
                 }
                 .sheet(isPresented: $showingCreate) {
-                    CreateGroupSheet()
+                    // After create we navigate straight into the chat thread.
+                    // The detour avoids SwiftData's brief @Query reactive lag
+                    // where a freshly-inserted group can momentarily look
+                    // missing from the list.
+                    CreateGroupSheet(onCreated: { group in
+                        navigateToGroup = group
+                    })
                 }
                 .sheet(isPresented: $showingJoin) {
-                    JoinGroupSheet()
+                    JoinGroupSheet(onJoined: { group in
+                        navigateToGroup = group
+                    })
+                }
+                .navigationDestination(item: $navigateToGroup) { group in
+                    GroupChatView(group: group)
                 }
                 .task {
                     _ = SocialService.me(in: context)
@@ -162,9 +180,12 @@ private struct GroupRow: View {
 }
 
 private struct CreateGroupSheet: View {
+    let onCreated: (StudyGroupModel) -> Void
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
+    @State private var errorMessage: String?
+    @State private var isCreating = false
 
     var body: some View {
         NavigationStack {
@@ -177,23 +198,49 @@ private struct CreateGroupSheet: View {
                         .font(.caption)
                         .foregroundStyle(DT.Color.textSecondary)
                 }
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage).foregroundStyle(DT.Color.error)
+                    }
+                }
             }
             .navigationTitle("새 그룹")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("취소") { dismiss() } }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("만들기") {
-                        _ = try? SocialService.createGroup(name: name, in: context)
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("취소") { dismiss() }.disabled(isCreating)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("만들기") { createGroup() }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
+                }
+            }
+        }
+    }
+
+    private func createGroup() {
+        errorMessage = nil
+        isCreating = true
+        Task {
+            defer { isCreating = false }
+            do {
+                let group = try await SocialService.createGroup(name: name, in: context)
+                onCreated(group)
+                dismiss()
+            } catch SocialError.emptyGroupName {
+                errorMessage = "그룹 이름을 입력해주세요."
+            } catch SocialError.saveFailed {
+                errorMessage = "기기 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+            } catch SocialError.serverPublishFailed {
+                errorMessage = "서버에 등록하지 못했어요. 인터넷 연결과 Firestore 규칙을 확인해주세요."
+            } catch {
+                errorMessage = "그룹을 만들지 못했어요. 잠시 후 다시 시도해주세요."
             }
         }
     }
 }
 
 private struct JoinGroupSheet: View {
+    let onJoined: (StudyGroupModel) -> Void
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var code: String = ""
@@ -234,15 +281,24 @@ private struct JoinGroupSheet: View {
     }
 
     private func join() {
-        do {
-            _ = try SocialService.joinGroup(byCode: code, in: context)
-            dismiss()
-        } catch SocialError.invalidGroupCode {
-            errorMessage = "코드 형식이 올바르지 않습니다."
-        } catch SocialError.groupNotFound {
-            errorMessage = "해당 코드의 그룹을 찾을 수 없어요."
-        } catch {
-            errorMessage = "참여에 실패했어요."
+        Task {
+            do {
+                let group = try await SocialService.joinGroup(byCode: code, in: context)
+                onJoined(group)
+                dismiss()
+            } catch SocialError.invalidGroupCode {
+                errorMessage = "코드 형식이 올바르지 않습니다."
+            } catch SocialError.groupNotFound {
+                errorMessage = "해당 코드의 그룹을 찾을 수 없어요."
+            } catch SocialError.lookupError(let err) {
+                errorMessage = err.errorDescription
+            } catch SocialError.serverPublishFailed {
+                errorMessage = "서버에 멤버 정보를 기록하지 못했어요. 인터넷과 Firestore 규칙을 확인해주세요."
+            } catch SocialError.saveFailed {
+                errorMessage = "기기 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+            } catch {
+                errorMessage = "참여에 실패했어요."
+            }
         }
     }
 }

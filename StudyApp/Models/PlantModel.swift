@@ -18,7 +18,7 @@ final class PlantModel {
     init(
         id: UUID = UUID(),
         seed: Int? = nil,
-        name: String = "내 새싹",
+        name: String = "내 바다",
         studyMinutes: Int = 0,
         workoutMinutes: Int = 0,
         createdAt: Date = Date()

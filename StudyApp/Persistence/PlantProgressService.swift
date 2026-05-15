@@ -17,6 +17,7 @@ enum PlantProgressService {
         Persistence.save({ try context.save() }, context: "plant.studyNutrient")
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
+        FirestoreSyncService.shared.publishPlant(plant)
     }
 
     /// Adds workout-time nutrients from a completed run.
@@ -28,6 +29,7 @@ enum PlantProgressService {
         Persistence.save({ try context.save() }, context: "plant.workoutNutrient")
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
+        FirestoreSyncService.shared.publishPlant(plant)
     }
 
     /// Adds workout-time nutrients from a non-GPS workout subject (gym/free)
@@ -40,6 +42,7 @@ enum PlantProgressService {
         Persistence.save({ try context.save() }, context: "plant.workoutFromTimer")
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
+        FirestoreSyncService.shared.publishPlant(plant)
     }
 
     /// Bonus nutrients when the user clears a 7-day streak. Split evenly
@@ -51,6 +54,7 @@ enum PlantProgressService {
         Persistence.save({ try context.save() }, context: "plant.streakBonus")
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
+        FirestoreSyncService.shared.publishPlant(plant)
     }
 
     private static func ensurePlant(context: ModelContext) -> PlantModel? {

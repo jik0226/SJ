@@ -70,17 +70,26 @@ struct DDayFormView: View {
             let all = (try? context.fetch(FetchDescriptor<DDayModel>())) ?? []
             all.forEach { $0.isPinned = false }
         }
+        let written: DDayModel
         if let d = existing {
             d.title = title
             d.targetDate = date
             d.emoji = emoji
             d.isPinned = isPinned
+            written = d
         } else {
-            context.insert(DDayModel(
+            let d = DDayModel(
                 title: title, targetDate: date, emoji: emoji, isPinned: isPinned
-            ))
+            )
+            context.insert(d)
+            written = d
         }
-        Persistence.save({ try context.save() }, context: "dday.save")
+        if Persistence.save({ try context.save() }, context: "dday.save") != nil {
+            // Publish whichever row we just touched + all unpinned siblings
+            // so the server's `isPinned` mirror stays consistent.
+            let all = (try? context.fetch(FetchDescriptor<DDayModel>())) ?? [written]
+            all.forEach(FirestoreSyncService.shared.publishDDay)
+        }
         WidgetSyncService.syncPinnedDDay(context: context)
         dismiss()
     }

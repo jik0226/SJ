@@ -1,6 +1,6 @@
 // PlantDetailView — preview canvas + nutrient breakdown + the actual math
-// formulas. The "내 식물의 식" section is what makes the mascot inspectable:
-// every line shows formula + current value so the plant is mathematically
+// formulas. The "내 바다의 식" section is what makes the ocean inspectable:
+// every line shows formula + current value so the visual is mathematically
 // transparent, not a black-box illustration.
 
 import SwiftUI
@@ -17,7 +17,7 @@ struct PlantDetailView: View {
     var body: some View {
         if let plant = plants.first {
             content(plant: plant)
-                .navigationTitle("내 식물")
+                .navigationTitle("내 바다")
         } else {
             ProgressView()
         }
@@ -73,11 +73,11 @@ struct PlantDetailView: View {
                 .font(DT.Typography.caption)
                 .foregroundStyle(DT.Color.textSecondary)
             HStack {
-                TextField("내 새싹", text: $draftName)
+                TextField("내 바다", text: $draftName)
                     .textFieldStyle(.roundedBorder)
                 Button("저장") {
                     plant.name = draftName.trimmingCharacters(in: .whitespaces)
-                    if plant.name.isEmpty { plant.name = "내 새싹" }
+                    if plant.name.isEmpty { plant.name = "내 바다" }
                     Persistence.save({ try context.save() }, context: "plant.name")
                 }
                 .disabled(draftName.trimmingCharacters(in: .whitespaces) == plant.name)
@@ -97,7 +97,7 @@ struct PlantDetailView: View {
                 NutrientPill(label: "공부", minutes: plant.studyMinutes, color: DT.Color.primary)
                 NutrientPill(label: "운동", minutes: plant.workoutMinutes, color: DT.Color.success)
             }
-            Text("공부와 운동을 균형 있게 채우면 꽃이 핍니다.")
+            Text("공부와 운동이 쌓일수록 파도가 깊어지고 물고기가 모입니다.")
                 .font(.caption)
                 .foregroundStyle(DT.Color.textSecondary)
         }
@@ -108,7 +108,7 @@ struct PlantDetailView: View {
 
     private func formulaSection(plant: PlantModel) -> some View {
         VStack(alignment: .leading, spacing: DT.Spacing.sm) {
-            Text("내 식물의 식")
+            Text("내 바다의 식")
                 .font(DT.Typography.caption)
                 .foregroundStyle(DT.Color.textSecondary)
             ForEach(plant.formulaLines, id: \.label) { line in
@@ -144,7 +144,7 @@ struct PlantDetailView: View {
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(DT.Color.textPrimary)
                 .textSelection(.enabled)
-            Text("같은 씨앗·같은 영양분이면 누구든 동일한 식물을 그립니다. 식물의 시작점입니다.")
+            Text("같은 씨앗·같은 영양분이면 누구든 동일한 파도와 물고기가 그려집니다. 바다의 시작점입니다.")
                 .font(.caption2)
                 .foregroundStyle(DT.Color.textSecondary)
         }

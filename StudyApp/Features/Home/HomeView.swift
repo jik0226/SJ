@@ -1,6 +1,5 @@
 // HomeView — top-level dashboard.
-// Plant card replaces the old mascot/species card: the visual itself is a
-// procedural canvas driven by PlantFormula(seed, nutrients).
+// Ocean card + clickable today-card → timer, planner card → today planner.
 
 import SwiftUI
 import SwiftData
@@ -8,6 +7,8 @@ import StudyCore
 
 struct HomeView: View {
     @Environment(AppState.self) private var appState
+    @State private var recovery = RecoveryState.shared
+    @State private var serverMode = ServerMode.shared
 
     @Query(filter: #Predicate<DDayModel> { $0.isPinned == true })
     private var pinnedDDays: [DDayModel]
@@ -19,24 +20,38 @@ struct HomeView: View {
 
     private let calendar = PlannerCalendar(cutoffHour: 3)
 
+    /// Bound by RootView so tapping the timer/planner card switches tabs.
+    @Binding var selection: RootTab
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: DT.Spacing.lg) {
+                    if let warning = recovery.warning {
+                        RecoveryBanner(warning: warning) { recovery.acknowledge() }
+                    }
+                    if case .offline(let reason) = serverMode.state {
+                        ServerOfflineBanner(reason: reason)
+                    }
                     if let error = appState.lastPersistenceError {
                         PersistenceErrorBanner(error: error) {
                             appState.lastPersistenceError = nil
                         }
                     }
-                    PlantCard(plant: plants.first)
-                    if let pinned = pinnedDDays.first {
-                        DDayCard(dday: pinned)
-                    }
+                    // Study-timer apps live or die by "today's total + start
+                    // now". Per the UX review, this lands above the ocean/D-Day
+                    // cards so the primary action is the first thing visible.
                     TodayProgressCard(
                         persistedSecondsToday: persistedSecondsToday,
                         liveSeconds: appState.timer.elapsedSeconds,
-                        timerState: appState.timer.state
+                        timerState: appState.timer.state,
+                        onTap: { selection = .timer }
                     )
+                    if let pinned = pinnedDDays.first {
+                        DDayCard(dday: pinned)
+                    }
+                    PlannerShortcutCard(onTap: { selection = .planner })
+                    OceanCard(plant: plants.first)
                     StreakCard()
                     Spacer(minLength: DT.Spacing.xxl)
                 }
@@ -44,8 +59,15 @@ struct HomeView: View {
                 .padding(.top, DT.Spacing.lg)
             }
             .background(DT.Color.surface.ignoresSafeArea())
-            .navigationTitle("오늘")
+            .navigationTitle(homeTitle)
         }
+    }
+
+    private var homeTitle: String {
+        let comps = Calendar.current.dateComponents([.month, .day], from: Date())
+        let m = comps.month ?? 0
+        let d = comps.day ?? 0
+        return "오늘 · \(m)/\(d)"
     }
 
     private var persistedSecondsToday: Int {
@@ -56,7 +78,7 @@ struct HomeView: View {
     }
 }
 
-private struct PlantCard: View {
+private struct OceanCard: View {
     let plant: PlantModel?
     @State private var sway: Double = 0
 
@@ -67,14 +89,14 @@ private struct PlantCard: View {
             VStack(spacing: DT.Spacing.md) {
                 if let plant {
                     PlantCanvasView(parameters: plant.parameters, sway: sway)
-                        .frame(height: 180)
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: DT.Radius.card))
                 } else {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(DT.Color.primary.opacity(0.5))
-                        .frame(height: 180)
+                    Color.blue.opacity(0.3)
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: DT.Radius.card))
                 }
-                Text(plant?.name ?? "씨앗")
+                Text(plant?.name ?? "내 바다")
                     .font(DT.Typography.title2)
                     .foregroundStyle(DT.Color.textPrimary)
                 if let plant {
@@ -82,7 +104,7 @@ private struct PlantCard: View {
                         .font(DT.Typography.caption)
                         .foregroundStyle(DT.Color.textSecondary)
                 } else {
-                    Text("처음 학습을 시작하면 자라기 시작합니다.")
+                    Text("학습을 시작하면 파도가 일어나기 시작합니다.")
                         .font(DT.Typography.caption)
                         .foregroundStyle(DT.Color.textSecondary)
                 }
@@ -98,14 +120,48 @@ private struct PlantCard: View {
         }
         .buttonStyle(.plain)
         .task {
-            // Gentle sway loop.
+            // Continuous gentle wave animation.
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 60_000_000)
                 await MainActor.run {
-                    sway = (sway + 0.008).truncatingRemainder(dividingBy: 1.0)
+                    sway = (sway + 0.006).truncatingRemainder(dividingBy: 1.0)
                 }
             }
         }
+    }
+}
+
+private struct PlannerShortcutCard: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: DT.Spacing.md) {
+                Image(systemName: "calendar.day.timeline.left")
+                    .font(.system(size: 24))
+                    .foregroundStyle(DT.Color.primary)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(DT.Color.primary.opacity(0.12)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("오늘 플래너")
+                        .font(DT.Typography.headline)
+                        .foregroundStyle(DT.Color.textPrimary)
+                    Text("10분 블록을 채우거나 과거 기록을 확인")
+                        .font(DT.Typography.caption)
+                        .foregroundStyle(DT.Color.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(DT.Color.textSecondary)
+            }
+            .padding(DT.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: DT.Radius.card)
+                    .fill(DT.Color.background)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 6, y: 1)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -139,6 +195,86 @@ private struct StreakCard: View {
                 .fill(DT.Color.background)
         )
         .shadow(color: .black.opacity(0.04), radius: 6, y: 1)
+    }
+}
+
+/// Banner shown when `AppModelContainer` had to side-line the previous store.
+/// We choose wording over icons so the user understands their data is safe
+/// (archived, not deleted) rather than silently lost.
+private struct RecoveryBanner: View {
+    let warning: RecoveryState.Warning
+    let onDismiss: () -> Void
+
+    private var title: String {
+        switch warning {
+            case .archivedAfterFailedOpen: return "이전 데이터는 안전히 보관됐어요"
+            case .inMemorySession: return "이번 세션은 디스크에 저장되지 않아요"
+        }
+    }
+
+    private var body_text: String {
+        switch warning {
+            case .archivedAfterFailedOpen(let url):
+                return "앱이 이전 기록을 열 수 없어 새로 시작했어요. 기존 파일은 그대로 보관 중이에요:\n\(url.lastPathComponent)"
+            case .inMemorySession:
+                return "디스크 접근에 실패해 메모리에만 기록됩니다. 앱을 종료하면 이번 기록은 사라져요. 잠시 후 앱을 다시 실행해 주세요."
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DT.Spacing.sm) {
+            Image(systemName: "exclamationmark.shield.fill")
+                .foregroundStyle(DT.Color.warning)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(DT.Typography.headline)
+                    .foregroundStyle(DT.Color.textPrimary)
+                Text(body_text)
+                    .font(DT.Typography.caption)
+                    .foregroundStyle(DT.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(DT.Color.textSecondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(DT.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: DT.Radius.card)
+                .fill(DT.Color.warning.opacity(0.12))
+        )
+    }
+}
+
+private struct ServerOfflineBanner: View {
+    let reason: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DT.Spacing.sm) {
+            Image(systemName: "wifi.exclamationmark")
+                .foregroundStyle(DT.Color.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("친구·채팅 서버 연결이 끊겼어요")
+                    .font(DT.Typography.headline)
+                    .foregroundStyle(DT.Color.textPrimary)
+                Text(reason)
+                    .font(DT.Typography.caption)
+                    .foregroundStyle(DT.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("타이머·플래너·바다는 평소처럼 동작합니다.")
+                    .font(DT.Typography.caption)
+                    .foregroundStyle(DT.Color.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(DT.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: DT.Radius.card)
+                .fill(DT.Color.warning.opacity(0.12))
+        )
     }
 }
 
@@ -210,29 +346,63 @@ private struct TodayProgressCard: View {
     let persistedSecondsToday: Int
     let liveSeconds: Int
     let timerState: TimerState
+    let onTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DT.Spacing.sm) {
-            Text("오늘 순공시간")
-                .font(DT.Typography.caption)
-                .foregroundStyle(DT.Color.textSecondary)
-            TimelineView(.periodic(from: .now, by: 1)) { _ in
-                Text(formatted(seconds: total))
-                    .font(DT.Typography.title1)
-                    .foregroundStyle(DT.Color.textPrimary)
-                    .monospacedDigit()
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: DT.Spacing.sm) {
+                Text("오늘 순공시간")
+                    .font(DT.Typography.caption)
+                    .foregroundStyle(DT.Color.textSecondary)
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Text(formatted(seconds: total))
+                        .font(.system(size: 52, weight: .heavy, design: .rounded))
+                        .foregroundStyle(DT.Color.textPrimary)
+                        .monospacedDigit()
+                }
+                HStack(spacing: DT.Spacing.sm) {
+                    Image(systemName: ctaIcon)
+                        .foregroundStyle(.white)
+                    Text(ctaLabel)
+                        .font(DT.Typography.headline)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.white.opacity(0.85))
+                        .font(.caption)
+                }
+                .padding(.horizontal, DT.Spacing.md)
+                .padding(.vertical, DT.Spacing.sm)
+                .background(
+                    RoundedRectangle(cornerRadius: DT.Radius.md)
+                        .fill(DT.Color.primary)
+                )
             }
-            Text("상태: \(stateLabel)")
-                .font(DT.Typography.caption)
-                .foregroundStyle(DT.Color.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DT.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: DT.Radius.card)
+                    .fill(DT.Color.background)
+            )
+            .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DT.Spacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: DT.Radius.card)
-                .fill(DT.Color.background)
-        )
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+        .buttonStyle(.plain)
+    }
+
+    private var ctaIcon: String {
+        switch timerState {
+            case .running: return "waveform"
+            case .paused: return "pause.fill"
+            default: return "play.fill"
+        }
+    }
+
+    private var ctaLabel: String {
+        switch timerState {
+            case .running: return "지금 공부 중 — 타이머로 이동"
+            case .paused: return "일시정지 중 — 재개하러 가기"
+            default: return "지금 바로 시작하기"
+        }
     }
 
     private var total: Int {

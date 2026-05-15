@@ -11,7 +11,20 @@ struct RunningView: View {
     @Environment(AppState.self) private var appState
     @State private var manager = RunningManager()
     @State private var completedSession: RunSession?
+    /// Set when HealthKit returns `.failed` so the SummarySheet can surface it
+    /// alongside the closing button. Top-of-screen banners get covered by the
+    /// sheet so they can't be the sole channel.
+    @State private var summaryHealthError: String?
+    /// Set when SwiftData failed to persist the run. We still show the recap
+    /// (the user did do the work) but flag prominently that it wasn't saved
+    /// so they can re-do or note it manually.
+    @State private var summarySaveFailed = false
     @State private var healthBanner: String?
+    @State private var pendingEndConfirm = false
+    @State private var lastSummaryNoise = false
+    /// Auto-started on entry so the user's "시작" from TimerView doesn't get
+    /// asked twice. Guards against re-entry when SwiftUI re-runs `.task`.
+    @State private var didAutoStart = false
 
     var body: some View {
         ScrollView {
@@ -52,13 +65,34 @@ struct RunningView: View {
                 case .failed(let reason):
                     healthBanner = "건강 앱 권한 요청 실패: \(reason)"
             }
+            // The user already tapped "시작" in TimerView — don't make them
+            // tap it again. Auto-start once permission resolution settles.
+            if !didAutoStart, manager.canStart, manager.state == .idle {
+                didAutoStart = true
+                manager.start()
+            }
+        }
+        .confirmationDialog(
+            "운동을 종료할까요?",
+            isPresented: $pendingEndConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("종료", role: .destructive) { endRun() }
+            Button("계속 진행", role: .cancel) {}
+        } message: {
+            Text("이번 운동을 마무리하고 기록을 저장합니다.")
         }
         .sheet(item: $completedSession) { session in
             RunSummarySheet(
                 session: session,
-                workoutType: subject.workoutType ?? .running
+                workoutType: subject.workoutType ?? .running,
+                isNoiseTier: lastSummaryNoise,
+                healthError: summaryHealthError,
+                saveFailed: summarySaveFailed
             ) {
                 completedSession = nil
+                summaryHealthError = nil
+                summarySaveFailed = false
                 dismiss()
             }
             .interactiveDismissDisabled()
@@ -71,7 +105,9 @@ struct RunningView: View {
 
     private func closeAction() {
         if isActive {
-            endRun()
+            // Funnel both the top-left "종료" and the bottom "종료" PillButton
+            // through the same confirmation so a stray tap can't drop the run.
+            pendingEndConfirm = true
         } else {
             dismiss()
         }
@@ -134,10 +170,10 @@ struct RunningView: View {
                         .disabled(!manager.canStart)
                 case .running:
                     PillButton(title: "일시정지", style: .ghost) { manager.pause() }
-                    PillButton(title: "종료", style: .primary) { endRun() }
+                    PillButton(title: "종료", style: .primary) { pendingEndConfirm = true }
                 case .paused:
                     PillButton(title: "재개", style: .primary) { manager.resume() }
-                    PillButton(title: "종료", style: .ghost) { endRun() }
+                    PillButton(title: "종료", style: .ghost) { pendingEndConfirm = true }
             }
         }
     }
@@ -147,31 +183,47 @@ struct RunningView: View {
         // actual running time, not wall-clock (which includes pauses).
         let activeSeconds = manager.elapsedSeconds
         guard let session = manager.end() else { return }
-        // Skip noise-tier sessions: tap-tap (no distance, no time) shouldn't
-        // pollute HealthKit or the planner.
+        // Noise tier: too-short to be a real session, so we don't persist.
+        // But surface that fact in the SummarySheet instead of dismissing —
+        // a silent dismiss makes the user wonder if a tap was eaten.
         let isNoise = session.distanceMeters < 100 && activeSeconds < 60
-        if isNoise {
-            dismiss()
-            return
-        }
-        context.insert(RunSessionModel(from: session))
-        Persistence.save({ try context.save() }, context: "run.save")
-        PlantProgressService.handleRunCompleted(session, context: context)
-        let workoutType = subject.workoutType ?? .running
-        Task {
-            let result = await HealthService.shared.saveWorkout(
-                workoutType: workoutType,
-                startedAt: session.startedAt,
-                activeSeconds: session.totalActiveSeconds,
-                distanceMeters: session.distanceMeters,
-                caloriesKcal: session.caloriesKcal
-            )
-            await MainActor.run {
-                switch result {
-                    case .saved, .noopShortRun, .unavailable:
-                        break
-                    case .failed(let reason):
-                        healthBanner = "건강 앱 저장 실패: \(reason)"
+        lastSummaryNoise = isNoise
+        if !isNoise {
+            let model = RunSessionModel(from: session)
+            context.insert(model)
+            let saved = Persistence.save({ try context.save() }, context: "run.save") != nil
+            summarySaveFailed = !saved
+            if saved {
+                // Only grow the ocean if persistence succeeded — otherwise the
+                // user could re-do the run and double-count their nutrients.
+                PlantProgressService.handleRunCompleted(session, context: context)
+                // Mirror to Firestore: raw run goes into /private, summary
+                // (todayStudyMinutes etc.) refreshes via AppState below.
+                FirestoreSyncService.shared.publishRun(model)
+                appState.publishPublicSnapshot(context: context)
+            } else {
+                // Roll back the optimistic insert so the persisted set stays
+                // consistent. The summary will warn the user that nothing was
+                // saved; doing the run again won't double up.
+                context.delete(model)
+            }
+            let workoutType = subject.workoutType ?? .running
+            Task {
+                let result = await HealthService.shared.saveWorkout(
+                    workoutType: workoutType,
+                    startedAt: session.startedAt,
+                    activeSeconds: session.totalActiveSeconds,
+                    distanceMeters: session.distanceMeters,
+                    caloriesKcal: session.caloriesKcal
+                )
+                await MainActor.run {
+                    switch result {
+                        case .saved, .noopShortRun, .unavailable:
+                            break
+                        case .failed(let reason):
+                            // Route into the sheet so the user actually sees it.
+                            summaryHealthError = reason
+                    }
                 }
             }
         }

@@ -21,9 +21,26 @@ struct GroupChatView: View {
     @State private var draft: String = ""
     @State private var showingShareSheet = false
     @State private var inlineError: String?
+    @State private var showingLeaveConfirm = false
     @FocusState private var inputFocused: Bool
 
     private var meCode: String { mes.first?.friendCode ?? "" }
+
+    /// 1:1 DMs are represented as two-member groups whose code starts with
+    /// the reserved DM prefix. We hide group-only affordances (join code,
+    /// "그룹 나가기") and surface a friend-info entry instead.
+    private var isDirectMessage: Bool {
+        group.code.hasPrefix(SocialService.directMessageCodePrefix)
+            && group.memberCodes.count == 2
+    }
+
+    private var dmFriend: FriendProfileModel? {
+        guard isDirectMessage else { return nil }
+        let otherCode = group.memberCodes.first { $0 != meCode }
+        guard let otherCode else { return nil }
+        let predicate = #Predicate<FriendProfileModel> { $0.friendCode == otherCode }
+        return try? context.fetch(FetchDescriptor(predicate: predicate)).first
+    }
 
     private var groupMessages: [ChatMessageModel] {
         let gid = group.id
@@ -54,13 +71,23 @@ struct GroupChatView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("그룹 코드 복사: \(group.code)") {
-                        UIPasteboard.general.string = group.code
+                    if isDirectMessage {
+                        if let friend = dmFriend {
+                            NavigationLink {
+                                FriendDetailView(friend: friend)
+                            } label: {
+                                Text("친구 정보")
+                            }
+                        }
+                    } else {
+                        Button("그룹 코드 복사: \(group.code)") {
+                            UIPasteboard.general.string = group.code
+                        }
                     }
                     Button(role: .destructive) {
-                        SocialService.leaveGroup(group, in: context)
+                        showingLeaveConfirm = true
                     } label: {
-                        Text("그룹 나가기")
+                        Text(isDirectMessage ? "대화 나가기" : "그룹 나가기")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -70,7 +97,33 @@ struct GroupChatView: View {
         .sheet(isPresented: $showingShareSheet) {
             ShareTodayRecordSheet(group: group)
         }
-        .task(id: group.id) { markRead() }
+        .confirmationDialog(
+            isDirectMessage ? "이 대화를 나갈까요?" : "그룹에서 나갈까요?",
+            isPresented: $showingLeaveConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("나가기", role: .destructive) {
+                SocialService.leaveGroup(group, in: context)
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            if isDirectMessage {
+                Text("대화 기록이 내 폰에서 사라집니다. 친구가 다시 메시지를 보내면 같은 대화방이 자동으로 열립니다.")
+            } else {
+                Text("나간 뒤 다시 참여하려면 그룹 코드(\(group.code))가 필요해요. 내가 마지막 멤버라면 그룹이 함께 사라집니다.")
+            }
+        }
+        .task(id: group.id) {
+            markRead()
+            // Firestore listener: new messages arriving from other devices
+            // get mirrored into SwiftData by FirestoreSyncService. The task
+            // cancellation tears the listener down when the user leaves the
+            // chat thread so we don't leak network sockets per group.
+            FirestoreSyncService.shared.startListening(group: group, context: context)
+        }
+        .onDisappear {
+            FirestoreSyncService.shared.stopListening(group: group)
+        }
     }
 
     private var messageList: some View {
@@ -91,6 +144,11 @@ struct GroupChatView: View {
             .onChange(of: groupMessages.last?.id) { _, newValue in
                 guard let newValue else { return }
                 withAnimation { proxy.scrollTo(newValue, anchor: .bottom) }
+                // The user is actively viewing the thread, so any message
+                // that lands while the screen is open should be marked read
+                // immediately — otherwise the unread badge lingers on the
+                // group row even though they're looking right at the message.
+                markRead()
             }
             .onAppear {
                 if let last = groupMessages.last?.id {
@@ -137,17 +195,31 @@ struct GroupChatView: View {
     private func send() {
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let result = SocialService.sendChat(text: trimmed, to: group, in: context)
-        switch result {
-            case .sent:
-                draft = ""
-                inlineError = nil
-            case .empty:
-                inlineError = "내용을 입력해주세요."
-            case .blockedByFilter(let reason):
-                inlineError = reason
-            case .saveFailed:
-                inlineError = "메시지 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+        // Optimistic: clear the input the moment we kick off the send. The
+        // bubble will show "전송 중…" until Firestore confirms, and flip to
+        // "전송 실패 — 다시 시도" if publish errors. This keeps the input
+        // responsive while still surfacing the real delivery status.
+        let captured = trimmed
+        draft = ""
+        inlineError = nil
+        Task {
+            let result = await SocialService.sendChat(
+                text: captured, to: group, in: context
+            )
+            switch result {
+                case .sent, .serverPublishFailed:
+                    // Bubble itself shows the failed state + retry option.
+                    break
+                case .empty:
+                    draft = captured
+                    inlineError = "내용을 입력해주세요."
+                case .blockedByFilter(let reason):
+                    draft = captured
+                    inlineError = reason
+                case .saveFailed:
+                    draft = captured
+                    inlineError = "메시지 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+            }
         }
     }
 
@@ -195,13 +267,23 @@ private struct MessageBubble: View {
                                 .fill(isMine ? DT.Color.primary : DT.Color.background)
                         )
                 }
-                Text(message.sentAt.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 10))
-                    .foregroundStyle(DT.Color.textSecondary)
+                HStack(spacing: 4) {
+                    Text(message.sentAt.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 10))
+                        .foregroundStyle(DT.Color.textSecondary)
+                    if isMine { deliveryIndicator }
+                }
             }
             if !isMine { Spacer(minLength: 40) }
         }
         .contextMenu {
+            if isMine, message.deliveryState == .failed {
+                Button {
+                    Task { await SocialService.retrySend(message, in: context) }
+                } label: {
+                    Label("다시 보내기", systemImage: "arrow.clockwise")
+                }
+            }
             if !isMine {
                 Button(role: .destructive) {
                     SocialService.reportMessage(message, in: context)
@@ -209,6 +291,38 @@ private struct MessageBubble: View {
                     Label("신고", systemImage: "exclamationmark.bubble")
                 }
             }
+        }
+    }
+
+    /// Tiny send-state badge next to my outgoing bubbles. Inbound messages
+    /// stay `.sent` so this only ever appears on my own side. The `.failed`
+    /// badge is the tap target itself — earlier the user had to long-press
+    /// to find "다시 보내기", but the label already looks tappable so we
+    /// promoted it to the actual action.
+    @ViewBuilder
+    private var deliveryIndicator: some View {
+        switch message.deliveryState {
+            case .sending:
+                Image(systemName: "clock")
+                    .font(.system(size: 9))
+                    .foregroundStyle(DT.Color.textSecondary)
+            case .failed:
+                Button {
+                    Task { await SocialService.retrySend(message, in: context) }
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.system(size: 10))
+                        Text("실패 - 다시 시도")
+                            .font(.system(size: 10, weight: .medium))
+                            .underline()
+                    }
+                    .foregroundStyle(DT.Color.error)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("메시지 다시 보내기")
+            case .sent:
+                EmptyView()
         }
     }
 }
@@ -296,22 +410,26 @@ private struct ShareTodayRecordSheet: View {
     }
 
     private func share(kind: AttachedKind, summary: String) {
-        let result = SocialService.sendChat(
-            text: "",
-            to: group,
-            attachedKind: kind,
-            attachedRecordSummary: summary,
-            in: context
-        )
-        switch result {
-            case .sent:
-                dismiss()
-            case .empty:
-                errorMessage = "공유할 내용이 비어 있어요."
-            case .blockedByFilter(let reason):
-                errorMessage = reason
-            case .saveFailed:
-                errorMessage = "공유에 실패했어요. 잠시 후 다시 시도해주세요."
+        Task {
+            let result = await SocialService.sendChat(
+                text: "",
+                to: group,
+                attachedKind: kind,
+                attachedRecordSummary: summary,
+                in: context
+            )
+            switch result {
+                case .sent, .serverPublishFailed:
+                    // Bubble carries the send state — close either way so
+                    // the user sees their record card appear in the thread.
+                    dismiss()
+                case .empty:
+                    errorMessage = "공유할 내용이 비어 있어요."
+                case .blockedByFilter(let reason):
+                    errorMessage = reason
+                case .saveFailed:
+                    errorMessage = "공유에 실패했어요. 잠시 후 다시 시도해주세요."
+            }
         }
     }
 }

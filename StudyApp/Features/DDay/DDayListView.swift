@@ -46,13 +46,18 @@ struct DDayListView: View {
             ddays.forEach { $0.isPinned = false }
         }
         d.isPinned.toggle()
-        Persistence.save({ try context.save() }, context: "dday.togglePin")
+        if Persistence.save({ try context.save() }, context: "dday.togglePin") != nil {
+            ddays.forEach(FirestoreSyncService.shared.publishDDay)
+        }
         WidgetSyncService.syncPinnedDDay(context: context)
     }
 
     private func delete(at offsets: IndexSet) {
+        let removed = offsets.map { ddays[$0].id }
         for i in offsets { context.delete(ddays[i]) }
-        Persistence.save({ try context.save() }, context: "dday.delete")
+        if Persistence.save({ try context.save() }, context: "dday.delete") != nil {
+            removed.forEach(FirestoreSyncService.shared.deleteDDay)
+        }
         WidgetSyncService.syncPinnedDDay(context: context)
     }
 }

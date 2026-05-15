@@ -36,6 +36,15 @@ final class AppState {
     private var lectureCapTimer: Timer?
 
     @ObservationIgnored
+    private var pomodoroTimer: Timer?
+
+    /// elapsedSeconds at the start of the current pomodoro work cycle.
+    /// Re-anchored on every (re)arm so the watcher compares per-cycle, not
+    /// against the cumulative session total.
+    @ObservationIgnored
+    private var pomodoroCycleStart: Int = 0
+
+    @ObservationIgnored
     private let liveActivity = LiveActivityController()
 
     init() {
@@ -76,6 +85,7 @@ final class AppState {
         do {
             let session = try timer.start(subject: subject)
             if subject.allowPhoneUse { startLectureCapWatch() }
+            startPomodoroWatchIfEnabled()
             guardAdapter.start()
             liveActivity.start(
                 sessionId: session.id,
@@ -122,6 +132,11 @@ final class AppState {
         guard timer.state == .paused else { return }
         try? timer.resume()
         liveActivity.resume(at: Date(), activeSeconds: timer.elapsedSeconds)
+        // Re-arm the pomodoro cycle from now. Two scenarios converge here:
+        // (1) pomodoro-triggered pause + manual resume → fresh cycle starts;
+        // (2) manual pause + manual resume → treat the break as the rest,
+        //     start a fresh work cycle. Net effect: a single source of truth.
+        startPomodoroWatchIfEnabled()
     }
 
     @discardableResult
@@ -137,6 +152,7 @@ final class AppState {
     private func closeSession() -> StudySession? {
         let session = try? timer.end()
         stopLectureCapWatch()
+        stopPomodoroWatch()
         guardAdapter.stop()
         if let session, let context = modelContext {
             persist(session, in: context)
@@ -158,11 +174,79 @@ final class AppState {
             }
             StreakService.evaluate(context: context)
             WidgetSyncService.syncAll(context: context)
+            mirrorAfterPersist(session: session, context: context)
         } catch let error as SessionPersistenceError {
             lastPersistenceError = error
         } catch {
             lastPersistenceError = .saveFailed(underlying: error)
         }
+    }
+
+    /// Pushes the freshly-saved session + derived summary numbers + ocean +
+    /// planner snapshot to Firestore. Each individual publish honors the
+    /// user's PrivacyPreferences inside FirestoreSyncService.
+    private func mirrorAfterPersist(session: StudySession, context: ModelContext) {
+        // 1) Raw session backup (always /private).
+        let sessionId = session.id
+        let predicate = #Predicate<StudySessionModel> { $0.id == sessionId }
+        if let row = try? context.fetch(FetchDescriptor(predicate: predicate)).first {
+            FirestoreSyncService.shared.publishSession(row)
+        }
+        // 2) Planner blocks the session may have filled in.
+        let day = session.plannerDay
+        let dayPredicate = #Predicate<PlannerBlockModel> { $0.plannerDay == day }
+        if let blocks = try? context.fetch(FetchDescriptor(predicate: dayPredicate)) {
+            blocks.forEach(FirestoreSyncService.shared.publishPlannerBlock)
+        }
+        // 3) Plant nutrient snapshot.
+        if let plant = try? context.fetch(FetchDescriptor<PlantModel>()).first {
+            FirestoreSyncService.shared.publishPlant(plant)
+        }
+        // 4) Public profile + summary (with privacy gates inside the service).
+        publishPublicSnapshot(context: context)
+    }
+
+    func publishPublicSnapshot(context: ModelContext) {
+        let me = SocialService.me(in: context)
+        let todayMinutes = todayStudyMinutes(context: context)
+        me.todayStudyMinutes = todayMinutes
+        FirestoreSyncService.shared.publishMe(me)
+        let plant = try? context.fetch(FetchDescriptor<PlantModel>()).first
+        let today = PlannerCalendar(cutoffHour: 3).plannerDay(for: Date())
+        let dayPredicate = #Predicate<PlannerBlockModel> { $0.plannerDay == today }
+        let plannerSnapshot: [Int: String]? = {
+            guard let blocks = try? context.fetch(FetchDescriptor(predicate: dayPredicate)) else { return nil }
+            let subjects = (try? context.fetch(FetchDescriptor<SubjectModel>())) ?? []
+            let byId = Dictionary(uniqueKeysWithValues: subjects.map { ($0.id, $0.colorHex) })
+            return blocks.reduce(into: [Int: String]()) { acc, b in
+                if let sid = b.subjectID, let hex = byId[sid] { acc[b.slotIndex] = hex }
+            }
+        }()
+        FirestoreSyncService.shared.publishSummaryFields(
+            weekMinutes: weekStudyMinutes(context: context),
+            streakDays: StreakService.currentLength,
+            oceanSeed: plant?.seed,
+            oceanNutrients: plant.map { (study: $0.studyMinutes, workout: $0.workoutMinutes) },
+            plannerTodaySlots: plannerSnapshot
+        )
+    }
+
+    private func todayStudyMinutes(context: ModelContext) -> Int {
+        let today = PlannerCalendar(cutoffHour: 3).plannerDay(for: Date())
+        let predicate = #Predicate<StudySessionModel> { $0.plannerDay == today }
+        let rows = (try? context.fetch(FetchDescriptor(predicate: predicate))) ?? []
+        return rows.reduce(0) { $0 + $1.totalSeconds } / 60
+    }
+
+    private func weekStudyMinutes(context: ModelContext) -> Int {
+        let cal = PlannerCalendar(cutoffHour: 3)
+        let today = cal.plannerDay(for: Date())
+        let weekAgo = today - 6
+        let predicate = #Predicate<StudySessionModel> {
+            $0.plannerDay >= weekAgo && $0.plannerDay <= today
+        }
+        let rows = (try? context.fetch(FetchDescriptor(predicate: predicate))) ?? []
+        return rows.reduce(0) { $0 + $1.totalSeconds } / 60
     }
 
     private func lookupSubject(id: UUID, in context: ModelContext) -> SubjectModel? {
@@ -210,6 +294,52 @@ final class AppState {
     func stopLectureCapWatch() {
         lectureCapTimer?.invalidate()
         lectureCapTimer = nil
+    }
+
+    /// True iff the pomodoro watcher is currently armed for a running session.
+    /// Drives the TimerView dial-vs-ring branch.
+    var isPomodoroArmed: Bool { pomodoroTimer != nil }
+
+    /// Seconds remaining in the current pomodoro work cycle. Returns the full
+    /// work duration when the cycle hasn't started ticking, and clamps at 0.
+    var pomodoroRemainingSeconds: Int {
+        let target = PomodoroSettings.workMinutes * 60
+        let used = max(0, timer.elapsedSeconds - pomodoroCycleStart)
+        return max(0, target - used)
+    }
+
+    // MARK: - Pomodoro watcher
+    func startPomodoroWatchIfEnabled() {
+        stopPomodoroWatch()
+        guard PomodoroSettings.isEnabled else { return }
+        // Anchor the cycle so the threshold check is per-cycle, not cumulative.
+        // Without this, a resumed session would fire the watcher immediately
+        // because elapsedSeconds is already past the work target.
+        pomodoroCycleStart = timer.elapsedSeconds
+        let cycleStart = pomodoroCycleStart
+        let target = PomodoroSettings.workMinutes * 60
+        let t = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.timer.state == .running,
+                   self.timer.elapsedSeconds - cycleStart >= target {
+                    self.pauseSession(reason: .userManual)
+                    NotificationsService.postPomodoroBreak(
+                        workMinutes: PomodoroSettings.workMinutes,
+                        restMinutes: PomodoroSettings.restMinutes
+                    )
+                    HapticFeedback.success()
+                    self.stopPomodoroWatch()
+                }
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        pomodoroTimer = t
+    }
+
+    func stopPomodoroWatch() {
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = nil
     }
 
     private func applyGuardAction(_ action: GuardAction) {

@@ -41,7 +41,7 @@
 
 ### Pass 3 — UI 흐름
 - 5탭 (홈/타이머/플래너/D-Day/더보기) → 모든 진입 정상
-- 더보기 → 통계/과목/내 식물/친구/그룹 채팅 5개 NavigationLink
+- 더보기 → 통계/과목/내 바다/친구/그룹 채팅 5개 NavigationLink
 - TimerView fullScreenCover → RunningView (toolbar 닫기로 endRun 우회 불가)
 - HomeView PlantCard → PlantDetailView NavigationLink
 - onboarding (만 나이 입력) 첫 실행 1회
@@ -98,7 +98,7 @@
 | **실기기 BackgroundGuard 회귀** | simctl tap 자동화 한계. ScreenLock / Call / Audio / Geometry 4 신호 코드는 단위 테스트로 정책 검증, 실기기 동작은 수동 |
 | **HealthKit 권한 다이얼로그** | 시뮬 자동화 한계. RunningView.task에서 `requestAuthorization` 호출은 코드 검증 |
 | **백그라운드 GPS** | `allowsBackgroundLocationUpdates` 코드 + Always 권한 시 활성. 시뮬에서 실제 잠금화면 추적 검증 어려움 |
-| **AI 마스코트 → 함수형 식물** | 사용자 지시로 폐기. AI 에셋 외부 의존 제거됨 |
+| **AI 마스코트 → 함수형 바다** | 사용자 지시로 폐기. AI 에셋 외부 의존 제거. PlantFormula 함수명은 git history 호환을 위해 유지하되 내부 산출물은 OceanParameters(파도·물고기) |
 
 ---
 
@@ -121,7 +121,7 @@
 | P1 | 미성년자 정책 enforcement 부재 | `SocialService.sendChat` 가 `me.isMinor` 인 경우 메시지 200자 cap (성인 500자), URL (`http`/`https`/`www`) 차단. 그룹 채팅에서 적용 |
 | P1 | 신고 버튼 UI 호출처 없음 | `GroupChatView.MessageBubble` 에 contextMenu 추가, 본인 메시지 외 메시지에 "신고" 항목 노출 → `SocialService.reportMessage` 호출 |
 | P2 | HealthKit 실패 silent | `HealthService.requestAuthorization` / `saveWorkout` 가 결과 enum 반환. `RunningView` 에 `healthBanner` State + 두 곳 (권한 요청 / 저장 결과) 모두 사유 노출 |
-| P2 | 마스코트 잔재 문구 | NotificationsService 알림 본문 "마스코트 EXP" → "식물에 영양분이 쌓이고 있어요". PLAN.md §3 / §4 / §11 마스코트 라인을 식물 시스템으로 정정 |
+| P2 | 마스코트 잔재 문구 | NotificationsService 알림 본문 "마스코트 EXP" → "바다에 영양분이 쌓이고 있어요". PLAN.md §3 / §4 / §11 마스코트 라인을 바다 시스템으로 정정 |
 
 ### 검증
 - `swift test`: 49/49
