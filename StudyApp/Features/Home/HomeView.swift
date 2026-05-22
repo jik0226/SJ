@@ -27,6 +27,15 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: DT.Spacing.lg) {
+                    // The primary CTA stays first no matter what. Problem
+                    // banners sit BELOW it (UX review) so a bad sync state
+                    // can never push "지금 바로 시작하기" off the first screen.
+                    TodayProgressCard(
+                        persistedSecondsToday: persistedSecondsToday,
+                        liveSeconds: appState.timer.elapsedSeconds,
+                        timerState: appState.timer.state,
+                        onTap: { selection = .timer }
+                    )
                     if let warning = recovery.warning {
                         RecoveryBanner(warning: warning) { recovery.acknowledge() }
                     }
@@ -38,15 +47,6 @@ struct HomeView: View {
                             appState.lastPersistenceError = nil
                         }
                     }
-                    // Study-timer apps live or die by "today's total + start
-                    // now". Per the UX review, this lands above the ocean/D-Day
-                    // cards so the primary action is the first thing visible.
-                    TodayProgressCard(
-                        persistedSecondsToday: persistedSecondsToday,
-                        liveSeconds: appState.timer.elapsedSeconds,
-                        timerState: appState.timer.state,
-                        onTap: { selection = .timer }
-                    )
                     if let pinned = pinnedDDays.first {
                         DDayCard(dday: pinned)
                     }

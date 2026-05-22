@@ -59,6 +59,46 @@ final class PlantFormulaTests: XCTestCase {
         XCTAssertLessThan(allStudy.bgHue, allWorkout.bgHue, "study-heavy bgHue must be cooler (lower hue) than workout-heavy")
     }
 
+    func testActivityOrderChangesOcean() {
+        // Same totals (study 60 + workout 30), different order → different
+        // sequence hash → different wave phases / fish placement.
+        let studyFirst = ActivitySequence.hash(of: [
+            ActivityEvent(kind: .study, minutes: 60, at: Date(timeIntervalSince1970: 0)),
+            ActivityEvent(kind: .workout, minutes: 30, at: Date(timeIntervalSince1970: 100)),
+        ])
+        let workoutFirst = ActivitySequence.hash(of: [
+            ActivityEvent(kind: .workout, minutes: 30, at: Date(timeIntervalSince1970: 0)),
+            ActivityEvent(kind: .study, minutes: 60, at: Date(timeIntervalSince1970: 100)),
+        ])
+        XCTAssertNotEqual(studyFirst, workoutFirst)
+
+        let a = PlantFormula.parameters(
+            seed: 7, nutrients: PlantNutrients(studyMinutes: 60, workoutMinutes: 30, sequenceHash: studyFirst)
+        )
+        let b = PlantFormula.parameters(
+            seed: 7, nutrients: PlantNutrients(studyMinutes: 60, workoutMinutes: 30, sequenceHash: workoutFirst)
+        )
+        // Same counts (totals identical) ...
+        XCTAssertEqual(a.waves.count, b.waves.count)
+        XCTAssertEqual(a.fish.count, b.fish.count)
+        // ... but different arrangement (at least one wave phase differs).
+        let phasesA = a.waves.map(\.phase)
+        let phasesB = b.waves.map(\.phase)
+        XCTAssertNotEqual(phasesA, phasesB)
+    }
+
+    func testEmptySequenceHashMatchesLegacy() {
+        // sequenceHash defaulting to 0 reproduces pre-sequence behavior so
+        // existing installs render identically until they log new activity.
+        let withZero = PlantFormula.parameters(
+            seed: 99, nutrients: PlantNutrients(studyMinutes: 120, workoutMinutes: 0, sequenceHash: 0)
+        )
+        let legacy = PlantFormula.parameters(
+            seed: 99, nutrients: PlantNutrients(studyMinutes: 120, workoutMinutes: 0)
+        )
+        XCTAssertEqual(withZero.waves.map(\.phase), legacy.waves.map(\.phase))
+    }
+
     func testFormulaDescriptionExposesAllLayers() {
         let p = PlantFormula.parameters(
             seed: seed,
@@ -68,7 +108,7 @@ final class PlantFormulaTests: XCTestCase {
             seed: seed,
             nutrients: PlantNutrients(studyMinutes: 200, workoutMinutes: 100)
         )
-        // 5 base lines + 1 line per wave layer.
-        XCTAssertEqual(lines.count, 5 + p.waves.count)
+        // 6 base lines (incl. activity-order seed) + 1 line per wave layer.
+        XCTAssertEqual(lines.count, 6 + p.waves.count)
     }
 }

@@ -16,7 +16,9 @@ struct GroupChatView: View {
     @Query(sort: \ChatMessageModel.sentAt)
     private var allMessages: [ChatMessageModel]
 
-    @Query private var blockedFriends: [FriendProfileModel]
+    /// All local profiles (friends + me). Used both for the blocked-sender
+    /// filter and for resolving a friendCode → nickname in chat bubbles.
+    @Query private var allProfiles: [FriendProfileModel]
 
     @State private var draft: String = ""
     @State private var showingShareSheet = false
@@ -25,6 +27,17 @@ struct GroupChatView: View {
     @FocusState private var inputFocused: Bool
 
     private var meCode: String { mes.first?.friendCode ?? "" }
+
+    /// friendCode → display nickname. Falls back to the code only for members
+    /// not in the local friend list (e.g. a group member you haven't added).
+    private func displayName(for code: String) -> String {
+        if code == meCode { return mes.first?.nickname ?? "나" }
+        if let match = allProfiles.first(where: { $0.friendCode == code }),
+           !match.nickname.trimmingCharacters(in: .whitespaces).isEmpty {
+            return match.nickname
+        }
+        return code
+    }
 
     /// 1:1 DMs are represented as two-member groups whose code starts with
     /// the reserved DM prefix. We hide group-only affordances (join code,
@@ -44,7 +57,7 @@ struct GroupChatView: View {
 
     private var groupMessages: [ChatMessageModel] {
         let gid = group.id
-        let blockedCodes = Set(blockedFriends.filter { $0.isBlocked }.map { $0.friendCode })
+        let blockedCodes = Set(allProfiles.filter { $0.isBlocked }.map { $0.friendCode })
         return allMessages.filter { msg in
             msg.groupId == gid
                 && !msg.isReported
@@ -133,7 +146,8 @@ struct GroupChatView: View {
                     ForEach(groupMessages) { msg in
                         MessageBubble(
                             message: msg,
-                            isMine: msg.senderFriendCode == meCode
+                            isMine: msg.senderFriendCode == meCode,
+                            senderName: displayName(for: msg.senderFriendCode)
                         )
                         .id(msg.id)
                     }
@@ -238,6 +252,7 @@ struct GroupChatView: View {
 private struct MessageBubble: View {
     let message: ChatMessageModel
     let isMine: Bool
+    var senderName: String = ""
     @Environment(\.modelContext) private var context
 
     var body: some View {
@@ -245,7 +260,7 @@ private struct MessageBubble: View {
             if isMine { Spacer(minLength: 40) }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
                 if !isMine {
-                    Text(message.senderFriendCode)
+                    Text(senderName)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(DT.Color.textSecondary)
                 }
@@ -253,6 +268,7 @@ private struct MessageBubble: View {
                     RecordAttachmentCard(
                         summary: summary,
                         kind: message.attachedKind,
+                        payloadJSON: message.attachedPayloadJSON,
                         isMine: isMine
                     )
                 }
@@ -330,24 +346,103 @@ private struct MessageBubble: View {
 private struct RecordAttachmentCard: View {
     let summary: String
     let kind: AttachedKind?
+    var payloadJSON: String? = nil
     let isMine: Bool
 
     var body: some View {
-        HStack(spacing: DT.Spacing.sm) {
-            Image(systemName: kind == .runSession ? "figure.run" : "book.fill")
-                .foregroundStyle(isMine ? .white : DT.Color.primary)
-            Text(summary)
-                .font(DT.Typography.caption)
-                .foregroundStyle(isMine ? .white : DT.Color.textPrimary)
+        VStack(alignment: .leading, spacing: DT.Spacing.xs) {
+            richPreview
+            HStack(spacing: DT.Spacing.sm) {
+                Image(systemName: icon)
+                    .foregroundStyle(isMine ? .white : DT.Color.primary)
+                Text(summary)
+                    .font(DT.Typography.caption)
+                    .foregroundStyle(isMine ? .white : DT.Color.textPrimary)
+            }
         }
         .padding(.horizontal, DT.Spacing.md)
         .padding(.vertical, DT.Spacing.sm)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isMine
-                      ? DT.Color.primaryDark
-                      : DT.Color.primary.opacity(0.10))
+                .fill(isMine ? DT.Color.primaryDark : DT.Color.primary.opacity(0.10))
         )
+    }
+
+    private var icon: String {
+        switch kind {
+            case .runSession: return "figure.run"
+            case .plannerDay: return "calendar"
+            case .oceanSnapshot: return "water.waves"
+            case .streak: return "flame.fill"
+            default: return "book.fill"
+        }
+    }
+
+    @ViewBuilder
+    private var richPreview: some View {
+        switch kind {
+            case .plannerDay:
+                if let planner = decode(AttachmentPayload.Planner.self) {
+                    PlannerMiniGrid(slots: planner.slots)
+                }
+            case .oceanSnapshot:
+                if let ocean = decode(AttachmentPayload.Ocean.self) {
+                    OceanMiniPreview(ocean: ocean)
+                }
+            case .streak:
+                if let streak = decode(AttachmentPayload.Streak.self) {
+                    Text("🔥 \(streak.days)")
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
+                        .foregroundStyle(isMine ? .white : DT.Color.primary)
+                }
+            default:
+                EmptyView()
+        }
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type) -> T? {
+        guard let json = payloadJSON, let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+}
+
+/// Compact color grid mirroring the planner blocks the sender filled today.
+private struct PlannerMiniGrid: View {
+    let slots: [String: String]
+
+    private let columns = Array(repeating: GridItem(.fixed(8), spacing: 2), count: 12)
+
+    var body: some View {
+        // Show the 12 most-recent filled slots as colored squares so the
+        // card stays small but recognizably "planner-shaped".
+        let entries = slots.sorted { (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }.prefix(24)
+        LazyVGrid(columns: columns, spacing: 2) {
+            ForEach(Array(entries), id: \.key) { _, hex in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color(hexString: hex) ?? DT.Color.primary)
+                    .frame(width: 8, height: 8)
+            }
+        }
+        .frame(maxWidth: 132)
+    }
+}
+
+/// Tiny static ocean reconstructed from the sender's seed + nutrients.
+private struct OceanMiniPreview: View {
+    let ocean: AttachmentPayload.Ocean
+
+    var body: some View {
+        PlantCanvasView(
+            parameters: PlantFormula.parameters(
+                seed: UInt64(bitPattern: Int64(ocean.seed)),
+                nutrients: PlantNutrients(
+                    studyMinutes: ocean.study, workoutMinutes: ocean.workout
+                )
+            ),
+            sway: 0
+        )
+        .frame(width: 132, height: 70)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -361,6 +456,8 @@ private struct ShareTodayRecordSheet: View {
     @Query private var studySessions: [StudySessionModel]
     @Query private var runSessions: [RunSessionModel]
     @Query private var subjects: [SubjectModel]
+    @Query private var plannerBlocks: [PlannerBlockModel]
+    @Query private var plants: [PlantModel]
 
     @State private var errorMessage: String?
 
@@ -372,26 +469,50 @@ private struct ShareTodayRecordSheet: View {
     private var todayRunMeters: Double {
         runSessions.filter { $0.plannerDay == today }.reduce(0.0) { $0 + $1.distanceMeters }
     }
+    private var todayPlannerSlots: [Int: String] {
+        let byId = Dictionary(uniqueKeysWithValues: subjects.map { ($0.id, $0.colorHex) })
+        var map: [Int: String] = [:]
+        for block in plannerBlocks where block.plannerDay == today {
+            if let sid = block.subjectID, let hex = byId[sid] { map[block.slotIndex] = hex }
+        }
+        return map
+    }
+    private var streakDays: Int { StreakService.currentLength }
 
     var body: some View {
         NavigationStack {
             List {
                 Section("오늘 기록") {
                     if todayStudy > 0 {
-                        Button("📚 오늘 순공 \(todayStudy / 60)분 공유") {
-                            share(kind: .studySession,
-                                  summary: "오늘 순공 \(todayStudy / 60)분")
+                        shareButton("📚", "오늘 순공 \(todayStudy / 60)분") {
+                            share(kind: .studySession, summary: "오늘 순공 \(todayStudy / 60)분")
                         }
                     }
                     if todayRunMeters > 0 {
                         let km = String(format: "%.2f", todayRunMeters / 1000)
-                        Button("🏃 오늘 러닝 \(km)km 공유") {
-                            share(kind: .runSession,
-                                  summary: "오늘 러닝 \(km)km")
+                        shareButton("🏃", "오늘 러닝 \(km)km") {
+                            share(kind: .runSession, summary: "오늘 러닝 \(km)km")
                         }
                     }
                     if todayStudy == 0 && todayRunMeters == 0 {
                         Text("아직 오늘 기록이 없어요").foregroundStyle(DT.Color.textSecondary)
+                    }
+                }
+                Section("성취 공유") {
+                    if !todayPlannerSlots.isEmpty {
+                        shareButton("🗓️", "오늘 플래너 \(todayPlannerSlots.count)칸") {
+                            sharePlanner()
+                        }
+                    }
+                    if let plant = plants.first {
+                        shareButton("🌊", "내 바다 (\(plant.name))") {
+                            shareOcean(plant)
+                        }
+                    }
+                    if streakDays > 0 {
+                        shareButton("🔥", "연속 학습 \(streakDays)일") {
+                            shareStreak()
+                        }
                     }
                 }
                 if let errorMessage {
@@ -402,26 +523,68 @@ private struct ShareTodayRecordSheet: View {
                     }
                 }
             }
-            .navigationTitle("기록 공유")
+            .navigationTitle("공유하기")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { Button("취소") { dismiss() } }
             }
         }
     }
 
-    private func share(kind: AttachedKind, summary: String) {
+    private func shareButton(_ emoji: String, _ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(emoji)
+                Text(title).foregroundStyle(DT.Color.textPrimary)
+                Spacer()
+                Image(systemName: "paperplane")
+                    .foregroundStyle(DT.Color.primary)
+            }
+        }
+    }
+
+    // MARK: - Share actions
+
+    private func sharePlanner() {
+        let payload = AttachmentPayload.Planner(
+            slots: todayPlannerSlots.reduce(into: [String: String]()) { $0[String($1.key)] = $1.value }
+        )
+        share(kind: .plannerDay,
+              summary: "오늘 플래너 \(todayPlannerSlots.count)칸 완료",
+              payload: encode(payload))
+    }
+
+    private func shareOcean(_ plant: PlantModel) {
+        let payload = AttachmentPayload.Ocean(
+            seed: plant.seed, study: plant.studyMinutes,
+            workout: plant.workoutMinutes, name: plant.name
+        )
+        share(kind: .oceanSnapshot,
+              summary: "내 바다 · 공부 \(plant.studyMinutes)분 / 운동 \(plant.workoutMinutes)분",
+              payload: encode(payload))
+    }
+
+    private func shareStreak() {
+        let payload = AttachmentPayload.Streak(days: streakDays)
+        share(kind: .streak, summary: "연속 학습 \(streakDays)일째 🔥", payload: encode(payload))
+    }
+
+    private func encode<T: Encodable>(_ value: T) -> String? {
+        guard let data = try? JSONEncoder().encode(value) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func share(kind: AttachedKind, summary: String, payload: String? = nil) {
         Task {
             let result = await SocialService.sendChat(
                 text: "",
                 to: group,
                 attachedKind: kind,
                 attachedRecordSummary: summary,
+                attachedPayloadJSON: payload,
                 in: context
             )
             switch result {
                 case .sent, .serverPublishFailed:
-                    // Bubble carries the send state — close either way so
-                    // the user sees their record card appear in the thread.
                     dismiss()
                 case .empty:
                     errorMessage = "공유할 내용이 비어 있어요."

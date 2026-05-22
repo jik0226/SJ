@@ -34,9 +34,12 @@ enum SocialService {
             return primary
         }
 
+        // Empty nickname = "not set yet". The friends UI gates code-sharing,
+        // friend-add, and chat on a real nickname so we never publish a
+        // placeholder like "나" that confuses the other side of a 1:1 chat.
         let me = FriendProfileModel(
             friendCode: FriendCode.generate(),
-            nickname: "나",
+            nickname: "",
             mascotSpecies: .rabbit,
             mascotStage: 0,
             isMinor: false,
@@ -44,11 +47,28 @@ enum SocialService {
         )
         context.insert(me)
         Persistence.save({ try context.save() }, context: "social.seedMe")
+        // Only publish once a nickname exists (publishMe self-guards too).
         FirestoreSyncService.shared.publishMe(me)
         return me
     }
 
+    /// True once the user has chosen a display name. Friend features stay
+    /// locked until this is set so other people never see "" or a placeholder.
+    static func hasNickname(in context: ModelContext) -> Bool {
+        !me(in: context).nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Demo data is gated behind an explicit launch argument (`--seed-demo`),
+    /// not just DEBUG. The simulator/TestFlight build is something real users
+    /// see, so a fresh install must start empty — "민서/준호/공부 메이트"
+    /// appearing unprompted reads as test-data leakage. Set the arg in the
+    /// Xcode scheme only when you want demo data for screenshots.
+    static var demoSeedingEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--seed-demo")
+    }
+
     static func seedDemoFriendsIfNeeded(in context: ModelContext) {
+        guard demoSeedingEnabled else { return }
         let predicate = #Predicate<FriendProfileModel> { $0.isMe == false }
         let descriptor = FetchDescriptor<FriendProfileModel>(predicate: predicate)
         let existing = (try? context.fetch(descriptor)) ?? []
@@ -363,6 +383,9 @@ enum SocialService {
     }
 
     static func seedDemoGroupIfNeeded(in context: ModelContext) {
+        // Gated behind --seed-demo (see seedDemoFriendsIfNeeded). Real users
+        // start with an empty group list and create/join their own.
+        guard demoSeedingEnabled else { return }
         let descriptor = FetchDescriptor<StudyGroupModel>()
         let existing = (try? context.fetch(descriptor)) ?? []
         guard existing.isEmpty else { return }
@@ -400,6 +423,7 @@ enum SocialService {
         to group: StudyGroupModel,
         attachedKind: AttachedKind? = nil,
         attachedRecordSummary: String? = nil,
+        attachedPayloadJSON: String? = nil,
         in context: ModelContext
     ) async -> ChatSendResult {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -426,6 +450,7 @@ enum SocialService {
             text: capped,
             attachedRecordSummary: attachedRecordSummary,
             attachedKind: attachedKind,
+            attachedPayloadJSON: attachedPayloadJSON,
             deliveryState: .sending
         )
         context.insert(msg)

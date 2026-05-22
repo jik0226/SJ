@@ -26,17 +26,30 @@ struct FriendsView: View {
     @State private var openingChatWith: FriendProfileModel?
     @State private var activeChat: StudyGroupModel?
     @State private var dmError: String?
+    @State private var server = ServerMode.shared
+    @State private var draftNickname = ""
+
+    private var nicknameSet: Bool {
+        !(mes.first?.nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: DT.Spacing.lg) {
-                    if let me = mes.first {
-                        myProfileCard(me: me)
+                    if !server.isOnline {
+                        OfflineNoticeBanner()
                     }
-                    friendListSection
-                    if !blockedFriends.isEmpty {
-                        blockedSection
+                    if !nicknameSet {
+                        // Friend features need a real display name first,
+                        // otherwise the other side sees a blank entry.
+                        nicknamePromptCard
+                    } else if let me = mes.first {
+                        myProfileCard(me: me)
+                        friendListSection
+                        if !blockedFriends.isEmpty {
+                            blockedSection
+                        }
                     }
                     Spacer(minLength: DT.Spacing.xxl)
                 }
@@ -50,6 +63,7 @@ struct FriendsView: View {
                     Button(action: { showingAdd = true }) {
                         Image(systemName: "person.badge.plus")
                     }
+                    .disabled(!server.isOnline || !nicknameSet)
                 }
             }
             .sheet(isPresented: $showingAdd) {
@@ -85,9 +99,9 @@ struct FriendsView: View {
                 )
                 activeChat = group
             } catch SocialError.serverPublishFailed {
-                dmError = "서버에 등록하지 못했어요. 인터넷 연결과 Firestore 규칙을 확인해주세요."
+                dmError = "서버 연결에 문제가 있어요. 잠시 후 다시 시도해주세요."
             } catch {
-                dmError = "채팅 방을 만들 수 없어요. 잠시 후 다시 시도해주세요."
+                dmError = "채팅방을 열 수 없어요. 잠시 후 다시 시도해주세요."
             }
         }
     }
@@ -103,6 +117,58 @@ struct FriendsView: View {
             }
         }
         .padding(.top, DT.Spacing.lg)
+    }
+
+    private var nicknamePromptCard: some View {
+        VStack(alignment: .leading, spacing: DT.Spacing.md) {
+            HStack(spacing: DT.Spacing.sm) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 28))
+                    .foregroundStyle(DT.Color.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("친구에게 보일 이름을 정해주세요")
+                        .font(DT.Typography.headline)
+                        .foregroundStyle(DT.Color.textPrimary)
+                    Text("이름을 정하면 친구코드 공유·친구 추가·채팅을 쓸 수 있어요.")
+                        .font(DT.Typography.caption)
+                        .foregroundStyle(DT.Color.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            TextField("예: 인겸", text: $draftNickname)
+                .textFieldStyle(.roundedBorder)
+                .submitLabel(.done)
+                .onSubmit { saveNickname() }
+            Button(action: saveNickname) {
+                Text("이름 저장")
+                    .font(DT.Typography.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, DT.Spacing.sm)
+                    .background(Capsule().fill(
+                        draftNickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? DT.Color.primary.opacity(0.4) : DT.Color.primary
+                    ))
+            }
+            .buttonStyle(.plain)
+            .disabled(draftNickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(DT.Spacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: DT.Radius.card)
+                .fill(DT.Color.background)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 6, y: 1)
+    }
+
+    private func saveNickname() {
+        let clean = draftNickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        let me = SocialService.me(in: context)
+        me.nickname = clean
+        if Persistence.save({ try context.save() }, context: "friends.setNickname") != nil {
+            FirestoreSyncService.shared.publishMe(me)
+        }
     }
 
     private func myProfileCard(me: FriendProfileModel) -> some View {
@@ -172,16 +238,32 @@ struct FriendsView: View {
         } else {
             VStack(spacing: DT.Spacing.md) {
                 ForEach(friends) { friend in
-                    NavigationLink {
-                        FriendDetailView(friend: friend)
+                    // Tapping the row opens the 1:1 chat (the action users
+                    // expect from "tap a friend"). The trailing info icon is a
+                    // separate tap target for the profile / block / delete.
+                    Button {
+                        openDM(with: friend)
                     } label: {
                         FriendRow(
                             friend: friend,
-                            isOpening: openingChatWith?.friendCode == friend.friendCode,
-                            onChatTap: { openDM(with: friend) }
+                            isOpening: openingChatWith?.friendCode == friend.friendCode
                         )
                     }
                     .buttonStyle(.plain)
+                    .overlay(alignment: .trailing) {
+                        if openingChatWith?.friendCode != friend.friendCode {
+                            NavigationLink {
+                                FriendDetailView(friend: friend)
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(DT.Color.textSecondary)
+                                    .padding(.trailing, DT.Spacing.lg)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
         }
@@ -191,7 +273,6 @@ struct FriendsView: View {
 private struct FriendRow: View {
     let friend: FriendProfileModel
     var isOpening: Bool = false
-    var onChatTap: () -> Void = {}
     @Environment(\.modelContext) private var context
 
     var body: some View {
@@ -212,17 +293,11 @@ private struct FriendRow: View {
             if isOpening {
                 ProgressView()
             } else {
-                // Speech-bubble button is the explicit "send DM" affordance.
-                // Tapping the row itself opens the profile (FriendDetailView).
-                Button(action: onChatTap) {
-                    Image(systemName: "bubble.left.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(DT.Color.primary)
-                        .padding(8)
-                        .background(Circle().fill(DT.Color.primary.opacity(0.12)))
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
+                Image(systemName: "bubble.left.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(DT.Color.primary.opacity(0.4))
+                // Trailing padding leaves room for the info-icon overlay.
+                Spacer().frame(width: DT.Spacing.lg)
             }
         }
         .padding(DT.Spacing.md)
@@ -276,7 +351,8 @@ private struct BlockedRow: View {
     }
 }
 
-private struct AddFriendSheet: View {
+// Internal so the chat inbox can offer "친구 추가" without re-implementing it.
+struct AddFriendSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var code: String = ""
@@ -337,11 +413,11 @@ private struct AddFriendSheet: View {
             } catch SocialError.lookupError(let err) {
                 errorMessage = err.errorDescription
             } catch SocialError.serverPublishFailed {
-                errorMessage = "서버에 친구 정보를 기록하지 못했어요. 인터넷과 Firestore 규칙을 확인해주세요."
+                errorMessage = "서버 연결에 문제가 있어요. 잠시 후 다시 시도해주세요."
             } catch SocialError.saveFailed {
-                errorMessage = "기기 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+                errorMessage = "저장에 실패했어요. 잠시 후 다시 시도해주세요."
             } catch {
-                errorMessage = "추가에 실패했습니다."
+                errorMessage = "추가에 실패했어요. 잠시 후 다시 시도해주세요."
             }
         }
     }

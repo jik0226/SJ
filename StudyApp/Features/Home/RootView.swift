@@ -6,7 +6,7 @@ import SwiftUI
 import SwiftData
 
 enum RootTab: String, Hashable {
-    case home, timer, planner, dday, more
+    case home, timer, planner, chat, more
 }
 
 struct RootView: View {
@@ -15,6 +15,22 @@ struct RootView: View {
 
     @State private var selection: RootTab = RootView.initialTab()
     @State private var didFirstSync = false
+
+    @Query(filter: #Predicate<FriendProfileModel> { $0.isMe == true })
+    private var mes: [FriendProfileModel]
+    @Query(filter: #Predicate<ChatMessageModel> { !$0.anyoneRead && !$0.isReported })
+    private var unreadChats: [ChatMessageModel]
+    @Query private var allGroups: [StudyGroupModel]
+
+    /// Unread messages across every group/DM I'm a member of, excluding my
+    /// own. Drives the badge on the 채팅 tab.
+    private var unreadCount: Int {
+        guard let me = mes.first else { return 0 }
+        let myGroupIds = Set(allGroups.filter { $0.memberCodes.contains(me.friendCode) }.map(\.id))
+        return unreadChats.filter {
+            myGroupIds.contains($0.groupId) && $0.senderFriendCode != me.friendCode
+        }.count
+    }
 
     var body: some View {
         TabView(selection: $selection) {
@@ -27,9 +43,10 @@ struct RootView: View {
             PlannerView()
                 .tag(RootTab.planner)
                 .tabItem { Label("플래너", systemImage: "calendar") }
-            DDayListView()
-                .tag(RootTab.dday)
-                .tabItem { Label("D-Day", systemImage: "flag.fill") }
+            ChatInboxView()
+                .tag(RootTab.chat)
+                .tabItem { Label("채팅", systemImage: "bubble.left.and.bubble.right.fill") }
+                .badge(unreadCount)
             MoreMenuView()
                 .tag(RootTab.more)
                 .tabItem { Label("더보기", systemImage: "ellipsis.circle.fill") }
@@ -49,6 +66,13 @@ struct RootView: View {
                 // of a mutual friendship pushes into our local SwiftData
                 // automatically when they add us.
                 FirestoreSyncService.shared.startListeningFriends(context: modelContext)
+                // Inbox: watch every group I'm a member of (incl. DMs others
+                // started) so incoming chats arrive as unread threads without
+                // me opening them first.
+                let myCode = SocialService.me(in: modelContext).friendCode
+                FirestoreSyncService.shared.startListeningMyGroups(
+                    myFriendCode: myCode, context: modelContext
+                )
                 // Re-publish summary after pull so the public doc reflects any
                 // remote data that arrived first on this device.
                 appState.publishPublicSnapshot(context: modelContext)
@@ -72,21 +96,6 @@ struct MoreMenuView: View {
     @Query(filter: #Predicate<FriendProfileModel> { $0.isMe == true })
     private var mes: [FriendProfileModel]
 
-    @Query(
-        filter: #Predicate<ChatMessageModel> { !$0.anyoneRead && !$0.isReported }
-    )
-    private var unreadChats: [ChatMessageModel]
-
-    @Query private var myGroups: [StudyGroupModel]
-
-    private var unreadCount: Int {
-        guard let me = mes.first else { return 0 }
-        let myGroupIds = Set(myGroups.filter { $0.memberCodes.contains(me.friendCode) }.map { $0.id })
-        return unreadChats.filter {
-            myGroupIds.contains($0.groupId) && $0.senderFriendCode != me.friendCode
-        }.count
-    }
-
     var body: some View {
         NavigationStack {
             List {
@@ -98,6 +107,9 @@ struct MoreMenuView: View {
                     }
                 }
                 Section("학습") {
+                    NavigationLink { DDayListView() } label: {
+                        Label("D-Day", systemImage: "flag.fill")
+                    }
                     NavigationLink { StatsView() } label: {
                         Label("통계", systemImage: "chart.bar.xaxis")
                     }
@@ -111,20 +123,6 @@ struct MoreMenuView: View {
                 Section("소셜") {
                     NavigationLink { FriendsView() } label: {
                         Label("친구", systemImage: "person.2.fill")
-                    }
-                    NavigationLink { GroupListView() } label: {
-                        HStack {
-                            Label("그룹 채팅", systemImage: "bubble.left.and.bubble.right.fill")
-                            Spacer()
-                            if unreadCount > 0 {
-                                Text("\(unreadCount)")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(DT.Color.error))
-                            }
-                        }
                     }
                 }
             }

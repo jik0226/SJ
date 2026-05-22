@@ -57,6 +57,30 @@ enum PlantProgressService {
         FirestoreSyncService.shared.publishPlant(plant)
     }
 
+    /// One planner slot = 10 minutes. Manually filling a slot should grow the
+    /// ocean just like a timer session would, otherwise "I filled my planner"
+    /// doesn't feel rewarded. Category decides study vs. workout nutrient.
+    static func handlePlannerSlotAssigned(category: SubjectCategory, context: ModelContext) {
+        guard let plant = ensurePlant(context: context) else { return }
+        plant.recordActivity(kind: category == .workout ? .workout : .study, minutes: 10)
+        Persistence.save({ try context.save() }, context: "plant.plannerSlotAdd")
+        WidgetSyncService.syncPlant(context: context)
+        WidgetCenter.shared.reloadAllTimelines()
+        FirestoreSyncService.shared.publishPlant(plant)
+    }
+
+    /// Clearing a slot undoes its 10-minute contribution (clamped at 0). The
+    /// activity log is intentionally left intact — a cleared slot reverses the
+    /// total but the historical ordering still happened.
+    static func handlePlannerSlotCleared(category: SubjectCategory, context: ModelContext) {
+        guard let plant = ensurePlant(context: context) else { return }
+        plant.reduceMinutes(kind: category == .workout ? .workout : .study, minutes: 10)
+        Persistence.save({ try context.save() }, context: "plant.plannerSlotClear")
+        WidgetSyncService.syncPlant(context: context)
+        WidgetCenter.shared.reloadAllTimelines()
+        FirestoreSyncService.shared.publishPlant(plant)
+    }
+
     private static func ensurePlant(context: ModelContext) -> PlantModel? {
         if let existing = try? context.fetch(FetchDescriptor<PlantModel>()).first {
             return existing

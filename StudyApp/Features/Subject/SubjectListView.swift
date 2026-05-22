@@ -91,6 +91,13 @@ struct SubjectFormView: View {
     @State private var workoutType: WorkoutType = .running
     @State private var hydrated = false
     @State private var showingDeleteConfirm = false
+    /// Whether a daily goal is set at all. Off ⇒ dailyTargetMinutes = 0,
+    /// which the timer surfaces as "목표 미설정" (record-only subject).
+    @State private var hasGoal: Bool = true
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private static let studyIcons = [
         "book", "function", "character.book.closed", "laptopcomputer",
@@ -167,8 +174,17 @@ struct SubjectFormView: View {
                         }
                     }
                 }
-                Section("일일 목표") {
-                    Stepper("\(dailyTargetMinutes)분", value: $dailyTargetMinutes, in: 10...600, step: 10)
+                Section {
+                    Toggle("일일 목표 설정", isOn: $hasGoal)
+                    if hasGoal {
+                        Stepper("\(dailyTargetMinutes)분", value: $dailyTargetMinutes, in: 10...600, step: 10)
+                    }
+                } header: {
+                    Text("일일 목표")
+                } footer: {
+                    Text(hasGoal
+                         ? "목표를 채우면 홈·타이머에서 진행률로 보여줘요."
+                         : "목표 없이 시간만 기록해요. 진행률 대신 누적 시간만 표시됩니다.")
                 }
                 Section {
                     Toggle("강의 모드 (다른 앱 사용 허용)", isOn: $allowPhoneUse)
@@ -193,7 +209,7 @@ struct SubjectFormView: View {
                     Button("취소") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("저장") { save() }.disabled(name.isEmpty)
+                    Button("저장") { save() }.disabled(trimmedName.isEmpty)
                 }
             }
             .onAppear { hydrate() }
@@ -226,7 +242,8 @@ struct SubjectFormView: View {
         name = s.name
         allowPhoneUse = s.allowPhoneUse
         category = s.category
-        dailyTargetMinutes = s.dailyTargetMinutes
+        hasGoal = s.dailyTargetMinutes > 0
+        dailyTargetMinutes = s.dailyTargetMinutes > 0 ? s.dailyTargetMinutes : 60
         iconName = s.sfSymbol
         if let wt = s.workoutType { workoutType = wt }
         if let idx = paletteIndex(forHex: s.colorHex) {
@@ -248,24 +265,28 @@ struct SubjectFormView: View {
     private func save() {
         let hex = "#" + String(format: "%06X", colorHexValue())
         let resolvedWorkoutType: WorkoutType? = (category == .workout) ? workoutType : nil
+        let cleanName = trimmedName
+        guard !cleanName.isEmpty else { return }
+        // 0 = no goal (record-only). The timer UI already handles this case.
+        let resolvedTarget = hasGoal ? dailyTargetMinutes : 0
         let written: SubjectModel
         if let s = existing {
-            s.name = name
+            s.name = cleanName
             s.colorHex = hex
             s.sfSymbol = iconName
             s.allowPhoneUse = allowPhoneUse
             s.categoryRaw = category.rawValue
-            s.dailyTargetMinutes = dailyTargetMinutes
+            s.dailyTargetMinutes = resolvedTarget
             s.workoutTypeRaw = resolvedWorkoutType?.rawValue
             written = s
         } else {
             let s = SubjectModel(
-                name: name,
+                name: cleanName,
                 colorHex: hex,
                 sfSymbol: iconName,
                 allowPhoneUse: allowPhoneUse,
                 category: category,
-                dailyTargetMinutes: dailyTargetMinutes,
+                dailyTargetMinutes: resolvedTarget,
                 workoutType: resolvedWorkoutType
             )
             context.insert(s)

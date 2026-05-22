@@ -19,6 +19,9 @@ final class ChatMessageModel {
     var attachedRecordSummary: String?
     /// Categorises the attachment when present.
     var attachedKindRaw: String?
+    /// JSON payload for rich attachments (planner slot colors, ocean seed +
+    /// nutrients, streak count). Decoded by RecordAttachmentCard per kind.
+    var attachedPayloadJSON: String?
     /// Per-receiver read flag isn't tracked separately yet; PoC keeps a single
     /// "anyone has read this" bit so badges work without a full receipts table.
     var anyoneRead: Bool
@@ -26,8 +29,10 @@ final class ChatMessageModel {
     /// Outbound delivery state — `sending` while the Firestore publish is
     /// in-flight, `sent` once it lands, `failed` on permission/network
     /// errors. Inbound (mirrored) messages are always `.sent`.
-    /// Stored as a raw String so SwiftData migration stays cheap.
-    var deliveryStateRaw: String
+    /// Stored as a raw String. The stored default is REQUIRED for SwiftData
+    /// lightweight migration: without it, adding this column to an existing
+    /// store fails (the previous cause of the data-wipe fallback).
+    var deliveryStateRaw: String = DeliveryState.sent.rawValue
 
     init(
         id: UUID = UUID(),
@@ -38,6 +43,7 @@ final class ChatMessageModel {
         isReported: Bool = false,
         attachedRecordSummary: String? = nil,
         attachedKind: AttachedKind? = nil,
+        attachedPayloadJSON: String? = nil,
         anyoneRead: Bool = false,
         deliveryState: DeliveryState = .sent
     ) {
@@ -49,6 +55,7 @@ final class ChatMessageModel {
         self.isReported = isReported
         self.attachedRecordSummary = attachedRecordSummary
         self.attachedKindRaw = attachedKind?.rawValue
+        self.attachedPayloadJSON = attachedPayloadJSON
         self.anyoneRead = anyoneRead
         self.deliveryStateRaw = deliveryState.rawValue
     }
@@ -66,6 +73,18 @@ final class ChatMessageModel {
 enum AttachedKind: String, Codable, CaseIterable, Sendable {
     case studySession
     case runSession
+    case plannerDay
+    case oceanSnapshot
+    case streak
+}
+
+/// Decoded payloads for rich attachments. Encoded into `attachedPayloadJSON`.
+enum AttachmentPayload {
+    /// slotIndex(0..143) → colorHex, for a mini planner grid.
+    struct Planner: Codable { var slots: [String: String] }
+    /// Reproduces the sender's ocean from deterministic inputs.
+    struct Ocean: Codable { var seed: Int; var study: Int; var workout: Int; var name: String }
+    struct Streak: Codable { var days: Int }
 }
 
 enum DeliveryState: String, Codable, CaseIterable, Sendable {

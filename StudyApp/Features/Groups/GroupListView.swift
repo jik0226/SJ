@@ -17,6 +17,7 @@ struct GroupListView: View {
     @State private var showingCreate = false
     @State private var showingJoin = false
     @State private var navigateToGroup: StudyGroupModel?
+    @State private var server = ServerMode.shared
 
     private var myGroups: [StudyGroupModel] {
         let myCodes = Set(mes.filter { $0.isMe }.map(\.friendCode))
@@ -41,6 +42,7 @@ struct GroupListView: View {
                         } label: {
                             Image(systemName: "plus")
                         }
+                        .disabled(!server.isOnline)
                     }
                 }
                 .sheet(isPresented: $showingCreate) {
@@ -71,22 +73,32 @@ struct GroupListView: View {
     @ViewBuilder
     private var content: some View {
         if myGroups.isEmpty {
-            VStack(spacing: DT.Spacing.md) {
-                Image(systemName: "person.3")
-                    .font(.system(size: 48))
-                    .foregroundStyle(DT.Color.textSecondary)
-                Text("아직 그룹이 없어요")
-                    .font(DT.Typography.body)
-                    .foregroundStyle(DT.Color.textSecondary)
-                Text("새 그룹을 만들거나 코드로 참여해보세요.")
-                    .font(DT.Typography.caption)
-                    .foregroundStyle(DT.Color.textSecondary)
+            ScrollView {
+                VStack(spacing: DT.Spacing.md) {
+                    if !server.isOnline {
+                        OfflineNoticeBanner()
+                            .padding(.horizontal, DT.Spacing.lg)
+                    }
+                    Spacer(minLength: DT.Spacing.xxl)
+                    Image(systemName: "person.3")
+                        .font(.system(size: 48))
+                        .foregroundStyle(DT.Color.textSecondary)
+                    Text("아직 그룹이 없어요")
+                        .font(DT.Typography.body)
+                        .foregroundStyle(DT.Color.textSecondary)
+                    Text("새 그룹을 만들거나 코드로 참여해보세요.")
+                        .font(DT.Typography.caption)
+                        .foregroundStyle(DT.Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(DT.Color.surface.ignoresSafeArea())
         } else {
             ScrollView {
                 LazyVStack(spacing: DT.Spacing.md) {
+                    if !server.isOnline {
+                        OfflineNoticeBanner()
+                    }
                     ForEach(myGroups) { group in
                         NavigationLink {
                             GroupChatView(group: group)
@@ -179,7 +191,8 @@ private struct GroupRow: View {
     }
 }
 
-private struct CreateGroupSheet: View {
+// Internal so the chat inbox can offer "새 그룹" directly.
+struct CreateGroupSheet: View {
     let onCreated: (StudyGroupModel) -> Void
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -229,9 +242,9 @@ private struct CreateGroupSheet: View {
             } catch SocialError.emptyGroupName {
                 errorMessage = "그룹 이름을 입력해주세요."
             } catch SocialError.saveFailed {
-                errorMessage = "기기 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+                errorMessage = "저장에 실패했어요. 잠시 후 다시 시도해주세요."
             } catch SocialError.serverPublishFailed {
-                errorMessage = "서버에 등록하지 못했어요. 인터넷 연결과 Firestore 규칙을 확인해주세요."
+                errorMessage = "서버 연결에 문제가 있어요. 잠시 후 다시 시도해주세요."
             } catch {
                 errorMessage = "그룹을 만들지 못했어요. 잠시 후 다시 시도해주세요."
             }
@@ -239,7 +252,8 @@ private struct CreateGroupSheet: View {
     }
 }
 
-private struct JoinGroupSheet: View {
+// Internal so the chat inbox can offer "그룹 참여" directly.
+struct JoinGroupSheet: View {
     let onJoined: (StudyGroupModel) -> Void
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -293,11 +307,11 @@ private struct JoinGroupSheet: View {
             } catch SocialError.lookupError(let err) {
                 errorMessage = err.errorDescription
             } catch SocialError.serverPublishFailed {
-                errorMessage = "서버에 멤버 정보를 기록하지 못했어요. 인터넷과 Firestore 규칙을 확인해주세요."
+                errorMessage = "서버 연결에 문제가 있어요. 잠시 후 다시 시도해주세요."
             } catch SocialError.saveFailed {
-                errorMessage = "기기 저장에 실패했어요. 잠시 후 다시 시도해주세요."
+                errorMessage = "저장에 실패했어요. 잠시 후 다시 시도해주세요."
             } catch {
-                errorMessage = "참여에 실패했어요."
+                errorMessage = "참여에 실패했어요. 잠시 후 다시 시도해주세요."
             }
         }
     }

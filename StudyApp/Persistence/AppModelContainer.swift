@@ -28,24 +28,21 @@ enum AppModelContainer {
         let bootStatus: BootStatus
 
         init() {
-            let schema = Schema([
-                SubjectModel.self,
-                DDayModel.self,
-                PlannerBlockModel.self,
-                DailyPageModel.self,
-                PlantModel.self,
-                StudySessionModel.self,
-                RunSessionModel.self,
-                FriendProfileModel.self,
-                StudyGroupModel.self,
-                ChatMessageModel.self,
-            ])
+            // Drive the schema from the versioned baseline so SwiftData has a
+            // migration plan to follow. Additive/optional field changes now
+            // migrate lightweight (data preserved) instead of tripping the
+            // backup fallback.
+            let schema = Schema(versionedSchema: StudySchemaV1.self)
             // Pin to Documents/ so sandbox always grants write access.
             let url = URL.documentsDirectory.appendingPathComponent("Study.sqlite")
             let config = ModelConfiguration(schema: schema, url: url)
 
             do {
-                self.container = try ModelContainer(for: schema, configurations: [config])
+                self.container = try ModelContainer(
+                    for: schema,
+                    migrationPlan: StudyMigrationPlan.self,
+                    configurations: [config]
+                )
                 self.bootStatus = .normal
                 AppModelContainer.seedIfNeeded(container: container)
                 RecoveryState.shared.report(.normal)
@@ -54,15 +51,18 @@ enum AppModelContainer {
                 Persistence.log(error, context: "ModelContainer.initial")
             }
 
-            // Likely cause on upgrade installs: legacy schema can't be opened
-            // by the current model set. Until we ship a real
-            // `SchemaMigrationPlan`, *move* the unreadable store to a backup
-            // folder rather than deleting it — the user's data is preserved
-            // and exportable, even though the app boots from a fresh store.
+            // Reaching here means even the migration plan couldn't open the
+            // store (corruption, or a breaking change without a stage). Move
+            // the unreadable store to a backup folder rather than deleting it
+            // — the user's data is preserved and exportable.
             let backupURL = Self.archiveLegacyStore(at: url)
 
             do {
-                self.container = try ModelContainer(for: schema, configurations: [config])
+                self.container = try ModelContainer(
+                    for: schema,
+                    migrationPlan: StudyMigrationPlan.self,
+                    configurations: [config]
+                )
                 if let backupURL {
                     self.bootStatus = .startedFreshAfterBackup(backupURL: backupURL)
                 } else {

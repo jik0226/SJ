@@ -86,22 +86,39 @@ struct BlockGridView: View {
         return SwiftUI.Color(hexString: subject.colorHex)
     }
 
+    private func category(of subjectID: UUID?) -> SubjectCategory? {
+        guard let id = subjectID else { return nil }
+        return subjects.first(where: { $0.id == id })?.category
+    }
+
     private func assign(slotIndex: Int, subjectID: UUID) {
         let key = PlannerBlockModel.makeSlotKey(plannerDay: plannerDay, slotIndex: slotIndex)
         let predicate = #Predicate<PlannerBlockModel> { $0.slotKey == key }
         let descriptor = FetchDescriptor<PlannerBlockModel>(predicate: predicate)
         let block: PlannerBlockModel
+        let previousSubjectID: UUID?
         if let existing = try? context.fetch(descriptor).first {
+            previousSubjectID = existing.subjectID
             existing.subjectID = subjectID
             block = existing
         } else {
+            previousSubjectID = nil
             block = PlannerBlockModel(
-                plannerDay: plannerDay, slotIndex: slotIndex, subjectID: subjectID
+                plannerDay: plannerDay, slotIndex: slotIndex, subjectID: subjectID,
+                source: .manual
             )
             context.insert(block)
         }
-        if Persistence.save({ try context.save() }, context: "planner.assignSlot") != nil {
-            FirestoreSyncService.shared.publishPlannerBlock(block)
+        guard Persistence.save({ try context.save() }, context: "planner.assignSlot") != nil else { return }
+        FirestoreSyncService.shared.publishPlannerBlock(block)
+        // Grow the ocean for this manually-logged 10-minute block. Handle the
+        // re-assign case by undoing the old category before adding the new.
+        if previousSubjectID == subjectID { return }  // no change
+        if let oldCat = category(of: previousSubjectID) {
+            PlantProgressService.handlePlannerSlotCleared(category: oldCat, context: context)
+        }
+        if let newCat = category(of: subjectID) {
+            PlantProgressService.handlePlannerSlotAssigned(category: newCat, context: context)
         }
     }
 
@@ -110,9 +127,13 @@ struct BlockGridView: View {
         let predicate = #Predicate<PlannerBlockModel> { $0.slotKey == key }
         let descriptor = FetchDescriptor<PlannerBlockModel>(predicate: predicate)
         if let existing = try? context.fetch(descriptor).first {
+            let removedCategory = category(of: existing.subjectID)
             context.delete(existing)
             if Persistence.save({ try context.save() }, context: "planner.clearSlot") != nil {
                 FirestoreSyncService.shared.deletePlannerBlock(slotKey: key)
+                if let removedCategory {
+                    PlantProgressService.handlePlannerSlotCleared(category: removedCategory, context: context)
+                }
             }
         }
     }

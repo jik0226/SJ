@@ -9,52 +9,85 @@ import StudyCore
 struct AgeOnboardingView: View {
     let onComplete: () -> Void
     @Environment(\.modelContext) private var context
+    @State private var nickname: String = ""
     @State private var birthDate: Date = Calendar.current.date(
         byAdding: .year, value: -18, to: Date()
     ) ?? Date()
+    @FocusState private var nicknameFocused: Bool
+
+    private var trimmedNickname: String {
+        nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
-        VStack(spacing: DT.Spacing.xl) {
-            Spacer()
-            VStack(spacing: DT.Spacing.md) {
-                Image(systemName: "person.crop.circle.badge.checkmark")
-                    .font(.system(size: 64))
-                    .foregroundStyle(DT.Color.primary)
-                Text("생년월일을 알려주세요")
-                    .font(DT.Typography.title1)
-                    .foregroundStyle(DT.Color.textPrimary)
-                Text("만 14세 미만 사용자에게는 안전 정책이 자동 적용됩니다.\n친구 검색·익명 메시지 등 일부 기능이 제한될 수 있어요.")
-                    .font(DT.Typography.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(DT.Color.textSecondary)
-                    .padding(.horizontal, DT.Spacing.lg)
+        ScrollView {
+            VStack(spacing: DT.Spacing.xl) {
+                VStack(spacing: DT.Spacing.md) {
+                    Image(systemName: "water.waves")
+                        .font(.system(size: 56))
+                        .foregroundStyle(DT.Color.primary)
+                    Text("SJ에 오신 걸 환영해요")
+                        .font(DT.Typography.title1)
+                        .foregroundStyle(DT.Color.textPrimary)
+                    Text("시작 전에 두 가지만 알려주세요.\n친구에게 보일 이름과 생년월일이에요.")
+                        .font(DT.Typography.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(DT.Color.textPrimary)
+                        .padding(.horizontal, DT.Spacing.lg)
+                }
+                .padding(.top, DT.Spacing.xxl)
+
+                VStack(alignment: .leading, spacing: DT.Spacing.xs) {
+                    Text("친구에게 보일 이름")
+                        .font(DT.Typography.caption)
+                        .foregroundStyle(DT.Color.textSecondary)
+                    TextField("예: 인겸", text: $nickname)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($nicknameFocused)
+                        .submitLabel(.done)
+                    Text("그룹·1:1 채팅에서 이 이름으로 보여요. 나중에 프로필에서 바꿀 수 있어요.")
+                        .font(.caption2)
+                        .foregroundStyle(DT.Color.textSecondary)
+                }
+                .padding(.horizontal, DT.Spacing.xl)
+
+                VStack(alignment: .leading, spacing: DT.Spacing.xs) {
+                    Text("생년월일")
+                        .font(DT.Typography.caption)
+                        .foregroundStyle(DT.Color.textSecondary)
+                    DatePicker(
+                        "생년월일",
+                        selection: $birthDate,
+                        in: dateRange,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    Text("청소년 보호 정책(만 14세 미만 메시지 제한 등) 적용에만 쓰여요. 외부에 공유하지 않습니다.")
+                        .font(.caption2)
+                        .foregroundStyle(DT.Color.textSecondary)
+                }
+                .padding(.horizontal, DT.Spacing.xl)
+
+                Button(action: complete) {
+                    Text("시작하기")
+                        .font(DT.Typography.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, DT.Spacing.md)
+                        .background(Capsule().fill(
+                            trimmedNickname.isEmpty ? DT.Color.primary.opacity(0.4) : DT.Color.primary
+                        ))
+                        .padding(.horizontal, DT.Spacing.xl)
+                }
+                .buttonStyle(.plain)
+                .disabled(trimmedNickname.isEmpty)
+
+                Spacer(minLength: DT.Spacing.xxl)
             }
-
-            DatePicker(
-                "생년월일",
-                selection: $birthDate,
-                in: dateRange,
-                displayedComponents: .date
-            )
-            .datePickerStyle(.wheel)
-            .labelsHidden()
-            .frame(height: 180)
-            .padding(.horizontal, DT.Spacing.xl)
-
-            Button(action: complete) {
-                Text("시작하기")
-                    .font(DT.Typography.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, DT.Spacing.md)
-                    .background(Capsule().fill(DT.Color.primary))
-                    .padding(.horizontal, DT.Spacing.xl)
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
         }
         .background(DT.Color.surface.ignoresSafeArea())
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private var dateRange: ClosedRange<Date> {
@@ -64,9 +97,14 @@ struct AgeOnboardingView: View {
     }
 
     private func complete() {
+        let cleanName = trimmedNickname
+        guard !cleanName.isEmpty else { return }
         let me = SocialService.me(in: context)
+        me.nickname = cleanName
         me.isMinor = isMinor(birthDate: birthDate)
-        Persistence.save({ try context.save() }, context: "onboarding.age")
+        Persistence.save({ try context.save() }, context: "onboarding.profile")
+        // Now that a real nickname exists, publish so friends can discover us.
+        FirestoreSyncService.shared.publishMe(me)
         UserDefaults.standard.set(true, forKey: "onboarding.complete")
         Task {
             await NotificationsService.requestAuthorizationIfNeeded()

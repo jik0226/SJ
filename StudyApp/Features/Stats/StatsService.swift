@@ -30,10 +30,27 @@ struct HourlyBucket: Identifiable, Hashable {
 enum StatsService {
     private static let calendar = PlannerCalendar(cutoffHour: 3)
 
+    private static let manualSlotSeconds = PlannerBlock.minutesPerSlot * 60
+
     static func daily(for plannerDay: Int, context: ModelContext) -> Int {
         let predicate = #Predicate<StudySessionModel> { $0.plannerDay == plannerDay }
         let sessions = (try? context.fetch(FetchDescriptor(predicate: predicate))) ?? []
-        return sessions.reduce(0) { $0 + $1.totalSeconds }
+        let sessionSeconds = sessions.reduce(0) { $0 + $1.totalSeconds }
+        return sessionSeconds + manualSeconds(for: plannerDay, context: context)
+    }
+
+    /// Seconds from manually-filled planner slots that no timer session
+    /// produced. Timer-sourced slots are excluded — those are already in the
+    /// session total — so study time isn't double-counted. This keeps Stats
+    /// consistent with the ocean's nutrient total, which also adds manual
+    /// slots on top of session minutes.
+    static func manualSeconds(for plannerDay: Int, context: ModelContext) -> Int {
+        let manualRaw = PlannerBlockSource.manual.rawValue
+        let predicate = #Predicate<PlannerBlockModel> {
+            $0.plannerDay == plannerDay && $0.source == manualRaw && $0.subjectID != nil
+        }
+        let blocks = (try? context.fetch(FetchDescriptor(predicate: predicate))) ?? []
+        return blocks.count * manualSlotSeconds
     }
 
     /// Last `days` planner days, oldest first.
@@ -64,6 +81,18 @@ enum StatsService {
         var totals: [UUID: Int] = [:]
         for s in sessions {
             totals[s.subjectID, default: 0] += s.totalSeconds
+        }
+        // Manual planner slots, per subject, in the same range.
+        let manualRaw = PlannerBlockSource.manual.rawValue
+        let blockPredicate = #Predicate<PlannerBlockModel> {
+            $0.plannerDay >= start && $0.plannerDay <= end
+                && $0.source == manualRaw && $0.subjectID != nil
+        }
+        let manualBlocks = (try? context.fetch(FetchDescriptor(predicate: blockPredicate))) ?? []
+        for b in manualBlocks {
+            if let sid = b.subjectID {
+                totals[sid, default: 0] += manualSlotSeconds
+            }
         }
         return totals
             .compactMap { id, secs -> SubjectTotal? in

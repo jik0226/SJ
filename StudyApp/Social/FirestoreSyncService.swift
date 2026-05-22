@@ -32,6 +32,7 @@ final class FirestoreSyncService {
     private let db = Firestore.firestore()
     private var groupListeners: [UUID: ListenerRegistration] = [:]
     private var friendsListener: ListenerRegistration?
+    private var myGroupsListener: ListenerRegistration?
 
     private init() {}
 
@@ -52,6 +53,10 @@ final class FirestoreSyncService {
     /// can't work at all).
     func publishMe(_ profile: FriendProfileModel) {
         guard let uid, let ref = userRef() else { return }
+        // Don't publish a placeholder/empty name — until the user picks a
+        // display name they shouldn't be discoverable, otherwise friends
+        // see a blank or "나" entry.
+        guard !profile.nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         var data: [String: Any] = [
             "uid": uid,
             "friendCode": profile.friendCode,
@@ -442,6 +447,88 @@ final class FirestoreSyncService {
         friendsListener = nil
     }
 
+    // MARK: - Inbox: all my groups (incl. DMs)
+
+    /// Subscribes to every group whose `memberCodes` contains my friendCode —
+    /// including 1:1 DM groups created by the *other* person. New/updated
+    /// groups are mirrored into local SwiftData, and each one gets a message
+    /// listener so an incoming DM lands as an unread thread without me having
+    /// to open it first. This is what makes "친구가 먼저 말 걸기"가 동작.
+    func startListeningMyGroups(myFriendCode: String, context: ModelContext) {
+        guard Auth.auth().currentUser != nil, !myFriendCode.isEmpty else { return }
+        myGroupsListener?.remove()
+        myGroupsListener = db.collection("groups")
+            .whereField("memberCodes", arrayContains: myFriendCode)
+            .addSnapshotListener { [weak self] snap, error in
+                if let error {
+                    Persistence.log(error, context: "firestore.myGroupsListener")
+                    return
+                }
+                guard let docs = snap?.documents else { return }
+                Task { @MainActor in
+                    self?.applyIncomingGroups(docs, context: context)
+                }
+            }
+    }
+
+    func stopListeningMyGroups() {
+        myGroupsListener?.remove()
+        myGroupsListener = nil
+        for (_, l) in groupListeners { l.remove() }
+        groupListeners.removeAll()
+    }
+
+    private func applyIncomingGroups(
+        _ docs: [QueryDocumentSnapshot], context: ModelContext
+    ) {
+        for doc in docs {
+            let data = doc.data()
+            guard let idString = data["id"] as? String,
+                  let gid = UUID(uuidString: idString) else { continue }
+            let code = data["code"] as? String ?? ""
+            let name = data["name"] as? String ?? "그룹"
+            let members = data["memberCodes"] as? [String] ?? []
+
+            let predicate = #Predicate<StudyGroupModel> { $0.id == gid }
+            if let existing = try? context.fetch(FetchDescriptor(predicate: predicate)).first {
+                existing.memberCodes = members
+                if existing.name != name, !code.hasPrefix(SocialService.directMessageCodePrefix) {
+                    existing.name = name
+                }
+            } else {
+                context.insert(StudyGroupModel(
+                    id: gid, code: code, name: name, memberCodes: members
+                ))
+            }
+            // Attach a message listener to this group if not already watching.
+            if groupListeners[gid] == nil {
+                attachMessageListener(groupId: gid, context: context)
+            }
+        }
+        Persistence.save({ try context.save() }, context: "firestore.applyIncomingGroups")
+    }
+
+    /// Lower-level message listener keyed by groupId (used by inbox sync).
+    /// `startListening(group:)` reuses this so a thread the user opens and a
+    /// thread discovered via inbox share one registration.
+    private func attachMessageListener(groupId: UUID, context: ModelContext) {
+        groupListeners[groupId]?.remove()
+        let listener = db.collection("chats").document(groupId.uuidString)
+            .collection("messages")
+            .order(by: "sentAt")
+            .addSnapshotListener { [weak self] snap, error in
+                if let error {
+                    Persistence.log(error, context: "firestore.chatListener")
+                    return
+                }
+                guard let changes = snap?.documentChanges else { return }
+                Task { @MainActor in
+                    self?.applyIncomingMessages(changes, groupId: groupId, context: context)
+                }
+            }
+        groupListeners[groupId] = listener
+    }
+
     private func applyIncomingFriends(
         _ changes: [DocumentChange], context: ModelContext
     ) {
@@ -546,6 +633,7 @@ final class FirestoreSyncService {
             "sentAt": msg.sentAt.timeIntervalSince1970,
             "attachedKind": msg.attachedKindRaw as Any,
             "attachedSummary": msg.attachedRecordSummary as Any,
+            "attachedPayload": msg.attachedPayloadJSON as Any,
         ]
         let gid = msg.groupId.uuidString
         let mid = msg.id.uuidString
@@ -555,25 +643,17 @@ final class FirestoreSyncService {
 
     func startListening(group: StudyGroupModel, context: ModelContext) {
         guard Auth.auth().currentUser != nil else { return }
-        stopListening(group: group)
-        let gid = group.id
-        let listener = db.collection("chats").document(gid.uuidString)
-            .collection("messages")
-            .order(by: "sentAt")
-            .addSnapshotListener { [weak self] snap, error in
-                if let error {
-                    Persistence.log(error, context: "firestore.chatListener")
-                    return
-                }
-                guard let docs = snap?.documentChanges else { return }
-                Task { @MainActor in
-                    self?.applyIncomingMessages(docs, groupId: gid, context: context)
-                }
-            }
-        groupListeners[gid] = listener
+        // Reuse the shared message-listener path. If the inbox sync already
+        // attached one for this group, this refreshes it harmlessly.
+        attachMessageListener(groupId: group.id, context: context)
     }
 
+    /// Only tears down a per-thread listener when the inbox sync isn't the
+    /// owner. With inbox sync active we keep listeners alive so unread DMs
+    /// keep arriving in the background; the global stopListeningMyGroups
+    /// handles teardown on sign-out.
     func stopListening(group: StudyGroupModel) {
+        guard myGroupsListener == nil else { return }
         groupListeners[group.id]?.remove()
         groupListeners.removeValue(forKey: group.id)
     }
@@ -599,7 +679,8 @@ final class FirestoreSyncService {
                 text: text,
                 sentAt: Date(timeIntervalSince1970: sentInterval),
                 attachedRecordSummary: data["attachedSummary"] as? String,
-                attachedKind: (data["attachedKind"] as? String).flatMap(AttachedKind.init(rawValue:))
+                attachedKind: (data["attachedKind"] as? String).flatMap(AttachedKind.init(rawValue:)),
+                attachedPayloadJSON: data["attachedPayload"] as? String
             )
             context.insert(mirrored)
         }
@@ -637,16 +718,19 @@ enum LookupError: LocalizedError {
         }
     }
 
+    /// User-facing copy only — no developer jargon ("Firestore", error codes).
+    /// The technical cause is already written to OSLog via Persistence.log at
+    /// the call site, so support can still diagnose without alarming the user.
     var errorDescription: String? {
         switch self {
             case .unauthenticated:
-                return "익명 로그인이 끝나지 않았어요. 잠시 후 다시 시도해주세요."
+                return "서버 연결을 준비 중이에요. 잠시 후 다시 시도해주세요."
             case .permissionDenied:
-                return "서버 접근 권한이 없어요. Firestore 규칙을 확인해주세요."
+                return "서버 연결에 문제가 있어요. 잠시 후 다시 시도하거나 문의해주세요."
             case .network:
-                return "서버에 연결할 수 없어요. 인터넷 상태를 확인해주세요."
-            case .unknown(let msg):
-                return "서버 오류가 발생했어요: \(msg)"
+                return "인터넷 연결을 확인하고 다시 시도해주세요."
+            case .unknown:
+                return "일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요."
         }
     }
 }

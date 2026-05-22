@@ -14,13 +14,20 @@ final class PlannerBlockModel {
     var slotIndex: Int
     var subjectID: UUID?
     var note: String?
+    /// "timer" = auto-filled by a finished timer session (already counted in
+    /// StudySessionModel), "manual" = user tapped the slot in the planner
+    /// (not backed by a session). Stats add only manual blocks so timer time
+    /// isn't double-counted. Stored default keeps migration lightweight and
+    /// treats legacy blocks as timer-sourced (no double count).
+    var source: String = PlannerBlockSource.timer.rawValue
 
     init(
         id: UUID = UUID(),
         plannerDay: Int,
         slotIndex: Int,
         subjectID: UUID? = nil,
-        note: String? = nil
+        note: String? = nil,
+        source: PlannerBlockSource = .timer
     ) {
         self.id = id
         self.slotKey = PlannerBlockModel.makeSlotKey(plannerDay: plannerDay, slotIndex: slotIndex)
@@ -28,11 +35,19 @@ final class PlannerBlockModel {
         self.slotIndex = slotIndex
         self.subjectID = subjectID
         self.note = note
+        self.source = source.rawValue
     }
+
+    var isManual: Bool { source == PlannerBlockSource.manual.rawValue }
 
     var compositeKey: String { slotKey }
 
     static func makeSlotKey(plannerDay: Int, slotIndex: Int) -> String {
         "\(plannerDay)-\(slotIndex)"
     }
+}
+
+enum PlannerBlockSource: String, Sendable {
+    case timer
+    case manual
 }

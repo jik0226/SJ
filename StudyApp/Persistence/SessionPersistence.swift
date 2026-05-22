@@ -37,9 +37,13 @@ enum SessionPersistence {
             let existing = try context.fetch(descriptor).first
             if let existing {
                 existing.subjectID = subjectID
+                // The timer session already counts this time; mark the slot
+                // timer-sourced so Stats doesn't add it again as manual.
+                existing.source = PlannerBlockSource.timer.rawValue
             } else {
                 context.insert(PlannerBlockModel(
-                    plannerDay: day, slotIndex: idx, subjectID: subjectID
+                    plannerDay: day, slotIndex: idx, subjectID: subjectID,
+                    source: .timer
                 ))
             }
         }

@@ -12,10 +12,16 @@ import Foundation
 public struct PlantNutrients: Equatable, Sendable {
     public var studyMinutes: Int
     public var workoutMinutes: Int
+    /// Hash derived from the *order* the user accumulated study/workout time.
+    /// Two users with identical totals but different activity orderings get
+    /// different wave phases + fish placement, so the ocean reflects "how"
+    /// you studied, not just "how much". 0 = no sequence info (legacy).
+    public var sequenceHash: UInt64
 
-    public init(studyMinutes: Int = 0, workoutMinutes: Int = 0) {
+    public init(studyMinutes: Int = 0, workoutMinutes: Int = 0, sequenceHash: UInt64 = 0) {
         self.studyMinutes = max(0, studyMinutes)
         self.workoutMinutes = max(0, workoutMinutes)
+        self.sequenceHash = sequenceHash
     }
 
     public var totalMinutes: Int { studyMinutes + workoutMinutes }
@@ -23,6 +29,41 @@ public struct PlantNutrients: Equatable, Sendable {
     public var studyRatio: Double {
         guard totalMinutes > 0 else { return 0.5 }
         return Double(studyMinutes) / Double(totalMinutes)
+    }
+}
+
+/// One logged activity. The ordered list of these is what makes the ocean
+/// order-sensitive — see `PlantNutrients.sequenceHash`.
+public struct ActivityEvent: Codable, Sendable, Equatable {
+    public enum Kind: String, Codable, Sendable { case study, workout }
+    public let kind: Kind
+    public let minutes: Int
+    public let at: Date
+
+    public init(kind: Kind, minutes: Int, at: Date = Date()) {
+        self.kind = kind
+        self.minutes = minutes
+        self.at = at
+    }
+
+    /// Compact token folded into the sequence hash.
+    public var token: String { "\(kind.rawValue):\(minutes)" }
+}
+
+public enum ActivitySequence {
+    /// FNV-1a over the ordered event tokens. Deterministic, order-sensitive:
+    /// reordering events changes the hash, which changes wave phases + fish.
+    public static func hash(of events: [ActivityEvent]) -> UInt64 {
+        var h: UInt64 = 14695981039346656037
+        for ev in events {
+            for byte in ev.token.utf8 {
+                h ^= UInt64(byte)
+                h = h &* 1099511628211
+            }
+            h ^= 0x2C  // comma separator so "1,23" ≠ "12,3"
+            h = h &* 1099511628211
+        }
+        return h
     }
 }
 
@@ -64,6 +105,11 @@ public enum PlantFormula {
         let total = Double(nutrients.totalMinutes)
         let study = Double(nutrients.studyMinutes)
         let workout = Double(nutrients.workoutMinutes)
+
+        // Fold activity ordering into the seed used for *placement* (phase +
+        // fish jitter). Layer/fish COUNTS still come from totals, but the
+        // arrangement now depends on the order you studied vs. worked out.
+        let seed = seed ^ nutrients.sequenceHash
 
         // 1..4 wave layers, more layers as the user accumulates time.
         let layerCount = min(4, max(1, 1 + Int(log10(total + 1.0) * 1.5)))
@@ -128,6 +174,9 @@ public enum PlantFormula {
             .init(label: "배경 색조 (HSL hue)",
                   formula: "0.58 - 공부비율 × 0.05",
                   value: String(format: "%.3f", p.bgHue)),
+            .init(label: "활동 순서 시드",
+                  formula: "FNV-1a(공부·운동 발생 순서) XOR 씨앗",
+                  value: String(nutrients.sequenceHash % 100000)),
         ]
         for (i, wave) in p.waves.enumerated() {
             lines.append(.init(
