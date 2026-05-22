@@ -113,7 +113,7 @@ extension SocialService {
     ) async throws -> StudyGroupModel {
         let meRow = me(in: context)
         let pair = [meRow.friendCode, friend.friendCode].sorted()
-        let groupID = directMessageGroupID(for: pair)
+        let groupID = DirectMessageKey.deterministicID(forSortedCodes: pair)
 
         let predicate = #Predicate<StudyGroupModel> { $0.id == groupID }
         if let existing = try? context.fetch(FetchDescriptor(predicate: predicate)).first {
@@ -145,18 +145,6 @@ extension SocialService {
             throw SocialError.serverPublishFailed
         }
         return group
-    }
-
-    /// SHA256-derived UUID from the two friendCodes. Both members compute
-    /// the same value regardless of who initiates the chat. Idempotent.
-    private static func directMessageGroupID(for sortedCodes: [String]) -> UUID {
-        let key = "dm|" + sortedCodes.joined(separator: "|")
-        let digest = SHA256.hash(data: Data(key.utf8))
-        let hex = digest.map { String(format: "%02x", $0) }.joined()
-        // 8-4-4-4-12 layout from the first 32 hex chars of the digest.
-        let s = Array(hex)
-        let formatted = "\(String(s[0..<8]))-\(String(s[8..<12]))-\(String(s[12..<16]))-\(String(s[16..<20]))-\(String(s[20..<32]))"
-        return UUID(uuidString: formatted) ?? UUID()
     }
 
     static func leaveGroup(_ group: StudyGroupModel, in context: ModelContext) {

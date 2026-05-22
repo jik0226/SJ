@@ -78,14 +78,9 @@ enum AttachedKind: String, Codable, CaseIterable, Sendable {
     case streak
 }
 
-/// Decoded payloads for rich attachments. Encoded into `attachedPayloadJSON`.
-enum AttachmentPayload {
-    /// slotIndex(0..143) → colorHex, for a mini planner grid.
-    struct Planner: Codable { var slots: [String: String] }
-    /// Reproduces the sender's ocean from deterministic inputs.
-    struct Ocean: Codable { var seed: Int; var study: Int; var workout: Int; var name: String }
-    struct Streak: Codable { var days: Int }
-}
+// AttachmentPayload moved to StudyCore (AttachmentPayload.swift) so the
+// JSON round-trip is unit-testable. AttachedKind stays here because it's
+// tied to this SwiftData @Model.
 
 enum DeliveryState: String, Codable, CaseIterable, Sendable {
     case sending
