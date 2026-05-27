@@ -88,6 +88,21 @@ extension SocialService {
     static func reportMessage(_ msg: ChatMessageModel, in context: ModelContext) {
         msg.isReported = true
         Persistence.save({ try context.save() }, context: "chat.report")
+        // Deliver the report to the server so it actually reaches the operator
+        // (Apple UGC guideline 1.2); the local flag alone is invisible to us.
+        // Capture value types up front — ChatMessageModel isn't Sendable, so it
+        // can't cross into the @MainActor hop.
+        let id = msg.id.uuidString
+        let gid = msg.groupId.uuidString
+        let code = msg.senderFriendCode
+        let text = msg.text
+        let summary = msg.attachedRecordSummary
+        Task { @MainActor in
+            FirestoreSyncService.shared.publishReport(
+                messageID: id, groupID: gid,
+                senderFriendCode: code, text: text, summary: summary
+            )
+        }
     }
 
     enum ChatSendResult: Equatable {

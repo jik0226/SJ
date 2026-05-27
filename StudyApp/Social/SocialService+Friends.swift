@@ -38,7 +38,8 @@ extension SocialService {
                         friendCode: remote.friendCode,
                         nickname: remote.nickname,
                         mascotSpecies: .cat,
-                        mascotStage: 0
+                        mascotStage: 0,
+                        serverUID: remote.uid
                     )
                     context.insert(real)
                     guard Persistence.save({ try context.save() }, context: "social.addFriend.remote") != nil else {

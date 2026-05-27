@@ -1,4 +1,4 @@
-// PlantWidget — Small widget rendering the ocean snapshot (waves + fish).
+// PlantWidget — Small widget rendering the ocean snapshot (waves + mascot).
 // Reads seed + nutrients from the App Group and re-derives the canvas locally.
 // Independent renderer so the widget extension doesn't pull in app-only modules.
 
@@ -26,11 +26,14 @@ struct PlantEntry: TimelineEntry {
     let seed: Int
     let studyMinutes: Int
     let workoutMinutes: Int
+    /// Activity-order hash — must match the app body's so the widget draws the
+    /// same ocean. Stored as a string in the App Group (UInt64 range).
+    let sequenceHash: UInt64
 }
 
 struct PlantProvider: TimelineProvider {
     func placeholder(in context: Context) -> PlantEntry {
-        PlantEntry(date: .now, name: "내 바다", seed: 12345, studyMinutes: 0, workoutMinutes: 0)
+        PlantEntry(date: .now, name: "내 바다", seed: 12345, studyMinutes: 0, workoutMinutes: 0, sequenceHash: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (PlantEntry) -> Void) {
@@ -51,7 +54,8 @@ struct PlantProvider: TimelineProvider {
             name: defaults?.string(forKey: "plant.name") ?? "내 바다",
             seed: defaults?.integer(forKey: "plant.seed") ?? 0,
             studyMinutes: defaults?.integer(forKey: "plant.studyMinutes") ?? 0,
-            workoutMinutes: defaults?.integer(forKey: "plant.workoutMinutes") ?? 0
+            workoutMinutes: defaults?.integer(forKey: "plant.workoutMinutes") ?? 0,
+            sequenceHash: UInt64(defaults?.string(forKey: "plant.sequenceHash") ?? "") ?? 0
         )
     }
 }
@@ -64,7 +68,8 @@ struct PlantWidgetView: View {
             seed: UInt64(bitPattern: Int64(entry.seed)),
             nutrients: PlantNutrients(
                 studyMinutes: entry.studyMinutes,
-                workoutMinutes: entry.workoutMinutes
+                workoutMinutes: entry.workoutMinutes,
+                sequenceHash: entry.sequenceHash
             )
         )
     }
@@ -101,15 +106,18 @@ private struct WidgetOceanCanvas: View {
     var body: some View {
         Canvas { ctx, size in
             let p = parameters
-            drawBackground(ctx: ctx, size: size, hue: p.bgHue)
-            drawWaves(ctx: ctx, size: size, waves: p.waves)
+            drawBackground(ctx: ctx, size: size, mood: p.mood)
+            drawWaves(ctx: ctx, size: size, waves: p.waves, mood: p.mood)
             drawFish(ctx: ctx, size: size, fish: p.fish)
+            drawMascot(ctx: ctx, size: size, p: p)
         }
     }
 
-    private func drawBackground(ctx: GraphicsContext, size: CGSize, hue: Double) {
-        let top = Color(hue: hue, saturation: 0.55, brightness: 0.45)
-        let bottom = Color(hue: hue, saturation: 0.45, brightness: 0.75)
+    // MARK: - Background uses mood palette
+
+    private func drawBackground(ctx: GraphicsContext, size: CGSize, mood: OceanMood) {
+        let top = Color(hue: mood.topHue, saturation: 0.38, brightness: 0.90)
+        let bottom = Color(hue: mood.bottomHue, saturation: 0.70, brightness: 0.28)
         let rect = CGRect(origin: .zero, size: size)
         ctx.fill(
             Path(rect),
@@ -121,7 +129,7 @@ private struct WidgetOceanCanvas: View {
         )
     }
 
-    private func drawWaves(ctx: GraphicsContext, size: CGSize, waves: [WaveLayer]) {
+    private func drawWaves(ctx: GraphicsContext, size: CGSize, waves: [WaveLayer], mood: OceanMood) {
         guard !waves.isEmpty else { return }
         let count = waves.count
         for (i, wave) in waves.enumerated() {
@@ -139,7 +147,7 @@ private struct WidgetOceanCanvas: View {
             path.addLine(to: CGPoint(x: 0, y: size.height))
             path.closeSubpath()
             let alpha = 0.35 + wave.depth * 0.55
-            let layerColor = Color(hue: parameters.bgHue, saturation: 0.55, brightness: 0.80)
+            let layerColor = Color(hue: mood.topHue, saturation: 0.55, brightness: 0.80)
             ctx.fill(path, with: .color(layerColor.opacity(alpha)))
         }
     }
@@ -160,6 +168,32 @@ private struct WidgetOceanCanvas: View {
             tail.addLine(to: CGPoint(x: cx + dir * (w/2 + w*0.4), y: cy + h*0.5))
             tail.closeSubpath()
             ctx.fill(tail, with: .color(color))
+        }
+    }
+
+    /// Simplified mascot: a single rounded shape with two big eyes so the
+    /// widget is recognizably different per mood without complex Path math.
+    private func drawMascot(ctx: GraphicsContext, size: CGSize, p: PlantParameters) {
+        let mp = p.mascotPlacement
+        let cx = mp.xRatio * size.width
+        let cy = mp.yRatio * size.height
+        let r = mp.sizeRatio * min(size.width, size.height) * 0.85
+        let bodyColor = Color(hue: p.mood.accentHue, saturation: 0.55, brightness: 0.78)
+        // Body.
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: cx - r, y: cy - r * 0.85, width: r * 2, height: r * 1.7)),
+            with: .color(bodyColor)
+        )
+        // Two big eyes.
+        for side in [-0.32, 0.32] {
+            let ex = cx + side * r
+            let ey = cy - r * 0.20
+            let er = r * 0.26
+            ctx.fill(Path(ellipseIn: CGRect(x: ex - er, y: ey - er, width: er * 2, height: er * 2)),
+                     with: .color(.white))
+            let pr = er * 0.55
+            ctx.fill(Path(ellipseIn: CGRect(x: ex - pr * 0.6, y: ey - pr, width: pr * 1.2, height: pr * 2)),
+                     with: .color(.black))
         }
     }
 }

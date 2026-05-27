@@ -18,6 +18,12 @@ final class FriendProfileModel {
     var isBlocked: Bool
     var addedAt: Date
     var todayStudyMinutes: Int
+    /// The friend's Firebase Auth UID. Backs member-based DM security: when we
+    /// open a 1:1 DM we seed the group's memberUids with both parties' UIDs so
+    /// the friend joins as a member, not via self-join (which the rules forbid
+    /// for DMs). Empty on legacy rows until the friends listener backfills it.
+    /// Stored default REQUIRED for SwiftData lightweight migration.
+    var serverUID: String = ""
 
     init(
         id: UUID = UUID(),
@@ -29,7 +35,8 @@ final class FriendProfileModel {
         isMe: Bool = false,
         isBlocked: Bool = false,
         addedAt: Date = Date(),
-        todayStudyMinutes: Int = 0
+        todayStudyMinutes: Int = 0,
+        serverUID: String = ""
     ) {
         self.id = id
         self.friendCode = friendCode
@@ -41,6 +48,7 @@ final class FriendProfileModel {
         self.isBlocked = isBlocked
         self.addedAt = addedAt
         self.todayStudyMinutes = todayStudyMinutes
+        self.serverUID = serverUID
     }
 
     var mascotSpecies: MascotSpecies {

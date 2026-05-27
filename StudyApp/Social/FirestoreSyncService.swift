@@ -114,10 +114,3 @@ struct RemoteFriend: Sendable {
     let friendCode: String
     let nickname: String
 }
-
-struct RemoteGroup: Sendable {
-    let id: UUID
-    let code: String
-    let name: String
-    let memberCodes: [String]
-}

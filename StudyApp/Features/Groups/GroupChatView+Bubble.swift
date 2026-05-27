@@ -193,7 +193,8 @@ struct OceanMiniPreview: View {
             parameters: PlantFormula.parameters(
                 seed: UInt64(bitPattern: Int64(ocean.seed)),
                 nutrients: PlantNutrients(
-                    studyMinutes: ocean.study, workoutMinutes: ocean.workout
+                    studyMinutes: ocean.study, workoutMinutes: ocean.workout,
+                    sequenceHash: ocean.sequenceHash ?? 0
                 )
             ),
             sway: 0

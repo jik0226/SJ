@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -24,6 +24,7 @@
 		2024197DF01D94977B1786D5 /* SceneGeometryObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F6584BE421B0F169236469A /* SceneGeometryObserver.swift */; };
 		21FCD00F57DAAF38A097BC0B /* HealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8789543815F4FA58FE88E2C4 /* HealthService.swift */; };
 		246BED55E4DE7BC822FE97E2 /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09AD417966740D6845B52DE /* TimerActivityAttributes.swift */; };
+		2476A8816E710E6797A99118 /* PlantCanvasView+Creatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EF0610BD861FAFC7D0B8BAC /* PlantCanvasView+Creatures.swift */; };
 		25152C1611B3A4D77D5FDB11 /* StudyWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1952E11BDB17637A6BF8D1A7 /* StudyWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2A7D4052AB04274BDB9325E3 /* ProfanityFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7DD7B77974BACB0C08DAEB /* ProfanityFilter.swift */; };
 		2D82D1AE813CF043C961EC96 /* DDayFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085A1D0777F0D8091CE2B54D /* DDayFormView.swift */; };
@@ -97,6 +98,7 @@
 		E3178E726D79D8858E5BB777 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE05ADE95490B581BF0E81F /* AppState.swift */; };
 		EB210488471E64673A210603 /* SocialService+Friends.swift in Sources */ = {isa = PBXBuildFile; fileRef = C887FE09965B4FC0D17B0BFA /* SocialService+Friends.swift */; };
 		EB6E43E6D04B58C2D1FC4F6A /* FriendProfileModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5218B21BDFE80AE71D65DD73 /* FriendProfileModel.swift */; };
+		EFAE0F2974B57C400E17B145 /* FirestoreSyncService+OutboundSocial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09AA775DFFF61A6A39DCD190 /* FirestoreSyncService+OutboundSocial.swift */; };
 		EFC0B21F768F6C5B27E03844 /* PlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2657E9D3C62A120830B883E2 /* PlannerView.swift */; };
 		F80BD91C3DA518927B6596F2 /* SocialService+Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2DDB0F70634E330916187F /* SocialService+Chat.swift */; };
 		FADCD86D837AC4D8E1A49794 /* OfflineNoticeBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DEC909F94090BE58B45749F /* OfflineNoticeBanner.swift */; };
@@ -131,10 +133,12 @@
 		02C9CAACD40165797545881B /* PlantDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlantDetailView.swift; sourceTree = "<group>"; };
 		03F9D8744F41BB6656BC0548 /* PlantCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlantCanvasView.swift; sourceTree = "<group>"; };
 		0596BEA31E87A76D57A479EF /* ChatMessageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageModel.swift; sourceTree = "<group>"; };
-		0749D30ACF6628AA066DBB9F /* StudyApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StudyApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0749D30ACF6628AA066DBB9F /* StudyApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StudyApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		085A1D0777F0D8091CE2B54D /* DDayFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDayFormView.swift; sourceTree = "<group>"; };
+		09AA775DFFF61A6A39DCD190 /* FirestoreSyncService+OutboundSocial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FirestoreSyncService+OutboundSocial.swift"; sourceTree = "<group>"; };
+		0EF0610BD861FAFC7D0B8BAC /* PlantCanvasView+Creatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlantCanvasView+Creatures.swift"; sourceTree = "<group>"; };
 		1861060885551FBDAC7502C1 /* DailyPageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyPageModel.swift; sourceTree = "<group>"; };
-		1952E11BDB17637A6BF8D1A7 /* StudyWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StudyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1952E11BDB17637A6BF8D1A7 /* StudyWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = StudyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A7DD7B77974BACB0C08DAEB /* ProfanityFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfanityFilter.swift; sourceTree = "<group>"; };
 		1FF0CE75C3F6C7E63CB2E635 /* GroupChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatView.swift; sourceTree = "<group>"; };
 		200D94A1C489B02012E71159 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
@@ -169,7 +173,7 @@
 		614E5641F035B1DCEEE45303 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		6421806FA804930F6CA1F946 /* RunSummarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunSummarySheet.swift; sourceTree = "<group>"; };
 		6E1C18434973546CE94B2DD8 /* CloudKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitService.swift; sourceTree = "<group>"; };
-		6FF22A55A31F513EF87BD3A7 /* StudyCore */ = {isa = PBXFileReference; lastKnownFileType = folder; path = StudyCore; sourceTree = SOURCE_ROOT; };
+		6FF22A55A31F513EF87BD3A7 /* StudyCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StudyCore; path = StudyCore; sourceTree = SOURCE_ROOT; };
 		71546A9BD6F517AEF115567A /* FirestoreSyncService+Outbound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FirestoreSyncService+Outbound.swift"; sourceTree = "<group>"; };
 		74A8C18872BCCEEF6AC9C864 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		7605047D26BD2E77FA07A0D2 /* BlockGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockGridView.swift; sourceTree = "<group>"; };
@@ -450,6 +454,7 @@
 			isa = PBXGroup;
 			children = (
 				03F9D8744F41BB6656BC0548 /* PlantCanvasView.swift */,
+				0EF0610BD861FAFC7D0B8BAC /* PlantCanvasView+Creatures.swift */,
 				02C9CAACD40165797545881B /* PlantDetailView.swift */,
 			);
 			path = Plant;
@@ -552,6 +557,7 @@
 				7E05A02D6A6098718BE5FEAF /* FirestoreSyncService+Inbound.swift */,
 				2B588FF18EC26BF6747EA98C /* FirestoreSyncService+Listeners.swift */,
 				71546A9BD6F517AEF115567A /* FirestoreSyncService+Outbound.swift */,
+				09AA775DFFF61A6A39DCD190 /* FirestoreSyncService+OutboundSocial.swift */,
 				93CDF5EFEA6B90A1B1410661 /* FriendCode.swift */,
 				1A7DD7B77974BACB0C08DAEB /* ProfanityFilter.swift */,
 				E6E1FC3B63835A7453AFDBCD /* SocialService.swift */,
@@ -617,12 +623,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					3F13F2B3A01850E953312923 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					D80C35A4C88159C36D4797B4 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -702,6 +710,7 @@
 				DFB2661634411EB943146ACF /* FirestoreSyncService+Inbound.swift in Sources */,
 				BC368D9B004375A1E7A48C62 /* FirestoreSyncService+Listeners.swift in Sources */,
 				09E55A2B66E47C6831D135FA /* FirestoreSyncService+Outbound.swift in Sources */,
+				EFAE0F2974B57C400E17B145 /* FirestoreSyncService+OutboundSocial.swift in Sources */,
 				7A4047821075C2621DA8D29E /* FirestoreSyncService.swift in Sources */,
 				AD1EF1DDCC35F37F047646E0 /* FocusModeView.swift in Sources */,
 				11DBBD20ADB0CC39831E18A6 /* FriendCode.swift in Sources */,
@@ -721,6 +730,7 @@
 				6B8AB6D5C220ABF5B0350D83 /* PersistenceLog.swift in Sources */,
 				9034740953B8C34ADBD0DD62 /* PlannerBlockModel.swift in Sources */,
 				EFC0B21F768F6C5B27E03844 /* PlannerView.swift in Sources */,
+				2476A8816E710E6797A99118 /* PlantCanvasView+Creatures.swift in Sources */,
 				49BD1DDFDB5D2442CBB3C13F /* PlantCanvasView.swift in Sources */,
 				AC8CF67CB5B0EE729355D5CF /* PlantDetailView.swift in Sources */,
 				18148ED458CDAFDCAFC21329 /* PlantModel.swift in Sources */,
@@ -808,7 +818,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 7969XVQ86R;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -831,7 +840,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -849,6 +857,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyApp/Info.plist;
@@ -876,6 +885,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -901,6 +911,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -952,7 +963,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 7969XVQ86R;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -968,7 +978,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -986,6 +995,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyApp/Info.plist;
@@ -1036,13 +1046,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		16BC295E479D83F9C400925C /* XCLocalSwiftPackageReference "StudyCore" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = StudyCore;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
 		23F539404CA45A9E8655506F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1061,6 +1064,13 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		16BC295E479D83F9C400925C /* XCLocalSwiftPackageReference "StudyCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = StudyCore;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		617A194778370487553915F8 /* GoogleSignIn */ = {

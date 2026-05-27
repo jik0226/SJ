@@ -131,6 +131,24 @@ struct GroupChatView: View {
         }
         .task(id: group.id) {
             markRead()
+            // Backfill our membership (uid + code) without touching name/code —
+            // the rules accept this as a member edit or a room self-join, so a
+            // legacy group we're in heals its memberUids the moment we open it.
+            // A full publish would clobber a freshly-joined room's placeholder
+            // name onto the server, so we only add ourselves here.
+            let gid = group.id
+            let isRoom = !group.code.hasPrefix(SocialService.directMessageCodePrefix)
+            if let myUid = AuthBootstrap.shared.currentUID {
+                try? await FirestoreSyncService.shared.joinGroupAddSelf(
+                    groupId: gid, myUid: myUid, myCode: meCode
+                )
+                // Re-register a room's join code in case it predates groupCodes.
+                if isRoom {
+                    try? await FirestoreSyncService.shared.publishGroupCode(
+                        code: group.code, gid: gid.uuidString
+                    )
+                }
+            }
             // Firestore listener: new messages arriving from other devices
             // get mirrored into SwiftData by FirestoreSyncService. The task
             // cancellation tears the listener down when the user leaves the

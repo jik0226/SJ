@@ -50,10 +50,37 @@ final class SocialLogicTests: XCTestCase {
     }
 
     func testOceanPayloadRoundTrip() throws {
-        let original = AttachmentPayload.Ocean(seed: 12345, study: 60, workout: 30, name: "내 바다")
+        let original = AttachmentPayload.Ocean(
+            seed: 12345, study: 60, workout: 30, name: "내 바다", sequenceHash: 999
+        )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(AttachmentPayload.Ocean.self, from: data)
         XCTAssertEqual(original, decoded)
+    }
+
+    func testOceanPayloadSequenceHashRoundTripsLosslessly() throws {
+        // UInt64.max loses precision if encoded through a Double. The share
+        // path JSON-encodes the hash, so assert the full 64-bit value survives
+        // — otherwise the receiver rebuilds a subtly different ocean.
+        let original = AttachmentPayload.Ocean(
+            seed: -42, study: 120, workout: 0, name: "x", sequenceHash: .max
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(AttachmentPayload.Ocean.self, from: data)
+        XCTAssertEqual(decoded.sequenceHash, .max)
+        XCTAssertEqual(original, decoded)
+    }
+
+    func testOceanPayloadLegacyJSONDecodesWithNilSequenceHash() throws {
+        // Messages sent before sequenceHash existed carry no such key; decoding
+        // must still succeed (nil → treated as 0 / legacy unordered shape) so
+        // old chat history doesn't break.
+        let legacy = #"{"seed":1,"study":2,"workout":3,"name":"old"}"#
+        let decoded = try JSONDecoder().decode(
+            AttachmentPayload.Ocean.self, from: XCTUnwrap(legacy.data(using: .utf8))
+        )
+        XCTAssertNil(decoded.sequenceHash)
+        XCTAssertEqual(decoded.seed, 1)
     }
 
     func testStreakPayloadRoundTrip() throws {

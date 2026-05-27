@@ -43,52 +43,160 @@
    - **Authentication → Sign-in method → Anonymous** (사용자 가입 없이 익명 UID 발급).
    - **Authentication → Sign-in method → Google** (계정 연결 기능에 필요. 활성화하면 OAuth 클라이언트 ID가 발급되고 plist에 자동 포함됨 → 새 plist 받아 교체)
    - **Firestore Database → Production 모드로 생성** (서울 리전 권장 `asia-northeast3`).
-5. Firestore 보안 규칙: 풀 미러를 고려해 다음 규칙으로 게시:
+5. Firestore 보안 규칙 — **멤버 기반(member-based)으로 강화**. 그룹/채팅은 그룹
+   `memberUids`(인증 UID)에 든 사용자만 읽고 쓸 수 있고, 그룹 목록 나열(enumeration)도
+   막혀 있습니다. 코드로 가입할 때는 `groupCodes/{code}` 룩업 문서로만 그룹 id를 찾습니다
+   (그룹 문서 자체는 비회원이 못 읽음). friendCode는 공개값이라 신뢰 경계로 쓸 수 없으므로
+   규칙은 모두 `request.auth.uid` 기준입니다. 아래 규칙을 콘솔 → Firestore Database → 규칙
+   에 붙여넣고 **게시**하세요:
 
    ```
    rules_version = '2';
    service cloud.firestore {
      match /databases/{database}/documents {
 
-       // Public profile: every authenticated user can read (friend
-       // discovery), only the owner can write.
-       match /users/{uid} {
-         allow read: if request.auth != null;
-         allow write: if request.auth != null && request.auth.uid == uid;
+       // ── Helpers ─────────────────────────────────────────────────────
+       function signedIn() { return request.auth != null; }
+       function oldUids() { return resource.data.get('memberUids', []); }
+       function newUids() { return request.resource.data.get('memberUids', []); }
+       function ownFriendCode() {
+         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('friendCode', '');
+       }
+       function isGroupMember() { return signedIn() && request.auth.uid in oldUids(); }
+       // A non-member joining a ROOM may add ONLY their own uid (and ONLY their
+       // own friendCode to memberCodes), must preserve everyone already there,
+       // must not touch name/code/id, and must not be a DM.
+       function isRoomSelfJoin() {
+         return signedIn()
+           && ownFriendCode() != ''
+           && !(request.auth.uid in oldUids())
+           && request.auth.uid in newUids()
+           && newUids().toSet().hasAll(oldUids().toSet())
+           && newUids().toSet().difference(oldUids().toSet()).hasOnly([request.auth.uid])
+           && !resource.data.get('code', '').matches('DM:.*')
+           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'memberCodes', 'updatedAt'])
+           // memberCodes must be PRESERVED (can't remove other members) and may
+           // only gain our own friendCode — never strip the roster.
+           && request.resource.data.get('memberCodes', []).toSet().hasAll(resource.data.get('memberCodes', []).toSet())
+           && request.resource.data.get('memberCodes', []).toSet()
+                .difference(resource.data.get('memberCodes', []).toSet()).hasOnly([ownFriendCode()]);
+       }
 
-         // Private subtree: only the owner can access.
+       // ── Public profile ──────────────────────────────────────────────
+       // Any signed-in user can read (friend discovery by code needs a
+       // collection query); only the owner writes their own profile.
+       match /users/{userId} {
+         allow read: if request.auth != null;
+         allow write: if request.auth.uid == userId;
+
+         // Private backup subtree: owner-only, never shared.
          match /private/{document=**} {
-           allow read, write: if request.auth != null
-             && request.auth.uid == uid;
+           allow read, write: if request.auth.uid == userId;
          }
 
-         // Friend subcollection (mutual links). The owner reads their own
-         // list; any authenticated user can write into another user's
-         // friends list so a one-tap "add" puts the connection on both
-         // sides without an accept/reject step. Tighten to a request
-         // model later when adding the accept flow.
+         // Friend links. The owner reads their own list. A write is allowed
+         // into your OWN list, or into someone else's list ONLY when the
+         // entry identifies you (data.uid == your uid) — that powers the
+         // one-tap mutual add without letting anyone forge arbitrary entries.
          match /friends/{otherUid} {
-           allow read: if request.auth != null && request.auth.uid == uid;
-           allow write: if request.auth != null;
+           allow read: if request.auth.uid == userId;
+           allow write: if request.auth.uid == userId
+                     || request.auth.uid == request.resource.data.uid;
          }
        }
 
-       // Groups: any authenticated user can read (so a join code can be
-       // resolved), members + creators can write.
+       // ── Groups ──────────────────────────────────────────────────────
+       // Member-gated. get/list are restricted to YOUR membership so no one can
+       // enumerate the collection or its rosters — the inbox query MUST be
+       // `where memberUids array-contains <uid>`. A non-member never reads the
+       // group doc; join-by-code resolves the id via /groupCodes, then self-joins.
+       //  • create — creator must include their own uid.
+       //  • update — a current member may edit; a non-member may only self-join
+       //    a ROOM (isRoomSelfJoin: adds only their own uid/code, never a DM).
+       //  • delete — a current member only (last one out drops the doc).
        match /groups/{groupId} {
-         allow read: if request.auth != null;
-         allow write: if request.auth != null;
+         allow get: if isGroupMember();
+         allow list: if isGroupMember();
+         // Shape-validated so a self-join setData(merge:) onto a MISSING doc
+         // (e.g. a stale groupCode pointing at a deleted group) can't create a
+         // malformed half-group — a create must carry the full, well-formed doc.
+         allow create: if signedIn()
+           && request.resource.data.keys().hasOnly(['id', 'code', 'name', 'memberCodes', 'memberUids', 'updatedAt'])
+           && request.resource.data.id == groupId
+           && request.resource.data.code is string
+           && request.resource.data.name is string
+           && request.resource.data.memberUids is list
+           && request.auth.uid in request.resource.data.memberUids;
+         allow update: if isGroupMember() || isRoomSelfJoin();
+         allow delete: if isGroupMember();
        }
 
-       // Chat messages: authenticated users only. Stricter "must be a
-       // group member" check left as a follow-up — requires storing UIDs
-       // in `groups/{gid}.memberUids` first.
+       // ── Group join codes ────────────────────────────────────────────
+       // Maps a join code → group id. Exact-code `get` only (no list → codes
+       // can't be enumerated). create-once by a member of the target group;
+       // immutable after. Holds only { gid } so the room name stays hidden
+       // until you actually join.
+       match /groupCodes/{code} {
+         allow get: if signedIn();
+         allow list: if false;
+         allow create: if signedIn()
+           && request.resource.data.keys().hasOnly(['gid', 'createdAt'])
+           && request.resource.data.gid is string
+           && exists(/databases/$(database)/documents/groups/$(request.resource.data.gid))
+           && get(/databases/$(database)/documents/groups/$(request.resource.data.gid)).data.code == code
+           && request.auth.uid in get(/databases/$(database)/documents/groups/$(request.resource.data.gid)).data.get('memberUids', []);
+         allow update, delete: if false;
+       }
+
+       // ── Chat messages (the sensitive content) ───────────────────────
+       // read/create only for users whose uid is in the parent group's
+       // memberUids. create additionally requires the message to carry the
+       // sender's OWN uid, so a member can't forge another member's
+       // senderFriendCode. Messages are immutable; moderation goes via /reports.
        match /chats/{groupId}/messages/{messageId} {
-         allow read, write: if request.auth != null;
+         allow read: if request.auth != null
+           && request.auth.uid in
+              get(/databases/$(database)/documents/groups/$(groupId)).data.get('memberUids', []);
+         allow create: if request.auth != null
+           && request.auth.uid in
+              get(/databases/$(database)/documents/groups/$(groupId)).data.get('memberUids', [])
+           && request.resource.data.senderUid == request.auth.uid;
+         allow update, delete: if false;
+       }
+
+       // ── Reports (UGC moderation) ────────────────────────────────────
+       // Users file content reports here; only the operator reads them in the
+       // console. A reporter may only create a report that identifies itself.
+       match /reports/{reportId} {
+         allow create: if request.auth.uid == request.resource.data.reporterUid;
+         allow read, update, delete: if false;
        }
      }
    }
    ```
+
+   > **배포 순서 주의**: 앱이 그룹 문서에 `memberUids`(인증 UID)를 쓰도록 업데이트된
+   > 뒤(또는 동시에) 이 규칙을 게시하세요. 기존 그룹 문서에는 `memberUids`가 없어,
+   > 규칙 게시 직후에는 멤버가 채팅방을 한 번 열어 재게시(`memberUids`에 본인 UID가
+   > arrayUnion)되기 전까지 해당 방의 메시지 읽기가 거부됩니다. DM은 열 때마다 자동
+   > 재게시되고, 그룹 방도 채팅 화면 진입 시 백필됩니다.
+
+   > **인박스/룸 마이그레이션**: 인박스가 `memberUids array-contains <uid>` 쿼리로 바뀌어,
+   > `memberUids`에 본인 UID가 없는 레거시 그룹은 한 번 열기 전까지 목록에서 안 보입니다(열면
+   > 백필). 또 기존 룸은 `groupCodes` 항목이 없어 새 멤버가 코드로 못 들어오므로, 멤버가 룸
+   > 채팅을 한 번 열면 `groupCodes`가 자동 등록되도록 했습니다(기존 멤버 1회 진입 필요).
+
+   > **기존 DM 1회 정리**: DM은 self-join이 금지되므로, `memberUids`가 채워지기 전에
+   > 만들어진 *기존* DM 문서는 양쪽 다 재게시가 막혀 메시지를 못 읽을 수 있어요(내용
+   > 유출은 없고 단순 "잠김"). 베타 테스트 데이터라면 콘솔에서 `groups` 중 `code`가
+   > `DM:`로 시작하는 문서 + 해당 `chats/{id}` 를 한 번 지우면, 다음에 친구 탭에서 열 때
+   > 양쪽 UID로 새로 안전하게 생성됩니다. (그룹 방은 영향 없음.)
+
+   > **무료 한계(공개 출시 전 과제)**: Cloud Functions(유료) 없이 "코드로 가입"을
+   > 유지하므로, DM id를 유추한 공격자가 *빈* DM 문서를 선점하는 DoS는 남습니다(내용
+   > 유출 아님, 정상 사용자가 그 방을 못 쓰게 되는 정도). 공개 출시 시에는 친구 관계에
+   > 무작위 DM 토큰을 심어 id를 유추 불가능하게 만들거나, 가입 검증 Function을
+   > 도입하는 것을 권장합니다.
 
 6. **Google Sign-In용 URL scheme**: 5)에서 Google provider를 켜면 plist의
    `REVERSED_CLIENT_ID`가 채워집니다 (예: `com.googleusercontent.apps.1234-abcdef`).

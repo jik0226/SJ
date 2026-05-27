@@ -1,11 +1,9 @@
 // OceanFormula — deterministic procedural ocean parameters.
 //
-// (seed, studyMinutes, workoutMinutes) → multi-layered wave + fish school.
-// Renderer is pure math: superposed sin waves for the surface, parametric
-// bezier-like curves for fish. No images.
-//
-// Naming note: the file lives in PlantFormula/ for git-history continuity,
-// but everything inside is the ocean system. The old plant types are gone.
+// (seed, studyMinutes, workoutMinutes) → waves + fish + mascot + mood palette
+// + bubbles + seabed + sky token. Pure math only; no images, no RNG, no Date().
+// Supplementary types (OceanMood, OceanMascot, BubbleMark, …) live in
+// OceanDecoration.swift in the same module.
 
 import Foundation
 
@@ -67,6 +65,8 @@ public enum ActivitySequence {
     }
 }
 
+// MARK: - Wave / Fish primitives
+
 /// One sinusoidal wave layer: `y = baseY + amplitude·sin(frequency·x + phase)`.
 public struct WaveLayer: Hashable, Sendable {
     public let amplitude: Double
@@ -87,18 +87,37 @@ public struct FishMark: Hashable, Sendable {
     public let facingRight: Bool
 }
 
+// MARK: - OceanParameters
+
 public struct OceanParameters: Equatable, Sendable {
     /// 1..4 wave layers, back-to-front order.
     public let waves: [WaveLayer]
-    /// 0..N fish.
+    /// 0..N fish (ambient school).
     public let fish: [FishMark]
-    /// Background gradient base hue (rough → calm blue band).
+    /// Background gradient base hue (back-compat; equals mood.topHue).
     public let bgHue: Double
     public let seed: UInt64
+
+    // --- Differentiation fields (new) ---
+
+    /// Mood bucket derived from studyRatio; drives palette + sky + mascot.
+    public let mood: OceanMood
+    /// Signature mascot creature for this user's activity combo.
+    public let mascot: OceanMascot
+    /// Where the mascot is placed on the canvas.
+    public let mascotPlacement: MascotPlacement
+    /// Sky decoration token shown in the top corner.
+    public let skyToken: SkyToken
+    /// Rising bubbles; count = min(10, workoutMinutes / 15).
+    public let bubbles: [BubbleMark]
+    /// Seabed starfish; count = min(6, studyMinutes / 30).
+    public let seabed: [SeabedMark]
 }
 
 /// Convenience alias so existing PlantWidget / PlantCanvas call sites compile.
 public typealias PlantParameters = OceanParameters
+
+// MARK: - Formula
 
 public enum PlantFormula {
     public static func parameters(seed: UInt64, nutrients: PlantNutrients) -> OceanParameters {
@@ -111,46 +130,85 @@ public enum PlantFormula {
         // arrangement now depends on the order you studied vs. worked out.
         let seed = seed ^ nutrients.sequenceHash
 
-        // 1..4 wave layers, more layers as the user accumulates time.
+        // Deterministic sub-seeds for each decoration category (LCG steps).
+        let seedA = seed &* 6364136223846793005 &+ 1442695040888963407
+        let seedB = seedA &* 6364136223846793005 &+ 1442695040888963407
+        let seedC = seedB &* 6364136223846793005 &+ 1442695040888963407
+
+        // MARK: Mood
+        let mood = OceanMood.from(studyRatio: nutrients.studyRatio)
+
+        // MARK: Waves — 1..4 layers
         let layerCount = min(4, max(1, 1 + Int(log10(total + 1.0) * 1.5)))
         var waves: [WaveLayer] = []
         for i in 0..<layerCount {
             let depth = Double(i) / Double(max(1, layerCount - 1))
-            // Amplitude grows with workout minutes (more "energy" in the sea),
-            // frequency grows with study minutes (more "detail" / focus).
+            // Amplitude grows with workout (energy); frequency with study (detail).
             let amplitude = 4.0 + sqrt(workout / 20.0) + Double(i) * 1.5
             let frequency = 0.4 + log(study + 1.0) * 0.08 + Double(i) * 0.15
-            // Seed-driven phase so two users with the same totals still
-            // get different-looking surfaces.
             let phase = Double((seed &+ UInt64(i * 7919)) % 1000) / 1000.0 * (2 * .pi)
             waves.append(WaveLayer(amplitude: amplitude, frequency: frequency, phase: phase, depth: depth))
         }
 
-        // Fish count grows with total minutes; a milestone-based rule so it
-        // doesn't get crowded but every hour of study is a visible win.
+        // MARK: Fish — ambient school tinted by mood accent
         let fishCount = min(12, max(0, Int(log10(total + 1.0) * 3.0) - 1))
+        let golden = 0.6180339887
         var fish: [FishMark] = []
         for i in 0..<fishCount {
-            // Distribute deterministically using golden-ratio jitter.
-            let golden = 0.6180339887
             let jx = (Double(i) * golden + Double(seed % 100) / 100.0).truncatingRemainder(dividingBy: 1)
             let jy = (Double(i) * golden * 2 + Double((seed >> 8) % 100) / 100.0).truncatingRemainder(dividingBy: 1)
-            let size = 0.04 + (Double(i % 3) * 0.015)
-            // Hue varies by study/workout ratio so the school colors shift over time.
-            let hue = (0.55 + nutrients.studyRatio * 0.10 + jy * 0.05).truncatingRemainder(dividingBy: 1)
+            let size = 0.04 + Double(i % 3) * 0.015
+            let hue = (mood.accentHue + jy * 0.08).truncatingRemainder(dividingBy: 1)
             fish.append(FishMark(
                 xRatio: jx,
-                yRatio: 0.45 + jy * 0.45,    // mid → deep water
+                yRatio: 0.45 + jy * 0.45,
                 sizeRatio: size,
                 bodyHue: hue,
                 facingRight: (i % 2 == 0)
             ))
         }
 
-        // Background base color: more workout → warmer (sunset), more study → cooler (dawn).
-        let bgHue = 0.58 - nutrients.studyRatio * 0.05
+        // MARK: Bubbles — count = min(10, workoutMinutes / 15)
+        let bubbleCount = min(10, nutrients.workoutMinutes / max(1, 15))
+        var bubbles: [BubbleMark] = []
+        for i in 0..<bubbleCount {
+            let bx = (Double(i) * golden + Double(seedA % 97) / 97.0).truncatingRemainder(dividingBy: 1)
+            let by = 0.4 + (Double(i) * golden * 1.3 + Double((seedA >> 16) % 53) / 53.0)
+                .truncatingRemainder(dividingBy: 1) * 0.5
+            let bSize = 0.008 + Double((seedA &+ UInt64(i * 3)) % 20) / 20.0 * 0.012
+            bubbles.append(BubbleMark(xRatio: bx, yRatio: by, sizeRatio: bSize))
+        }
 
-        return OceanParameters(waves: waves, fish: fish, bgHue: bgHue, seed: seed)
+        // MARK: Seabed — count = min(6, studyMinutes / 30)
+        let seabedCount = min(6, nutrients.studyMinutes / max(1, 30))
+        var seabed: [SeabedMark] = []
+        for i in 0..<seabedCount {
+            let sx = (Double(i) * golden * 1.7 + Double(seedB % 83) / 83.0).truncatingRemainder(dividingBy: 1)
+            let hue = (mood.accentHue + Double((seedB &+ UInt64(i * 11)) % 30) / 30.0 * 0.2)
+                .truncatingRemainder(dividingBy: 1)
+            let sSize = 0.04 + Double((seedB &+ UInt64(i * 5)) % 15) / 15.0 * 0.025
+            seabed.append(SeabedMark(kind: .starfish, xRatio: sx, hue: hue, sizeRatio: sSize))
+        }
+
+        // MARK: Mascot placement — deterministic by seed
+        let mascot = OceanMascot.from(studyRatio: nutrients.studyRatio)
+        let mascotX = 0.15 + Double(seedC % 71) / 71.0 * 0.70      // 0.15 .. 0.85
+        let mascotY = 0.48 + Double((seedC >> 24) % 30) / 30.0 * 0.25  // mid-lower
+        let mascotSize = 0.11 + Double((seedC >> 40) % 20) / 20.0 * 0.04  // 0.11..0.15
+        let placement = MascotPlacement(xRatio: mascotX, yRatio: mascotY, sizeRatio: mascotSize)
+
+        return OceanParameters(
+            waves: waves,
+            fish: fish,
+            bgHue: mood.topHue,
+            seed: seed,
+            mood: mood,
+            mascot: mascot,
+            mascotPlacement: placement,
+            skyToken: SkyToken.from(mood: mood),
+            bubbles: bubbles,
+            seabed: seabed
+        )
     }
 
     /// Human-readable formula description shown in the detail sheet.
@@ -171,8 +229,23 @@ public enum PlantFormula {
             .init(label: "물고기 수",
                   formula: "min(12, max(0, ⌊log₁₀(총분 + 1) × 3⌋ - 1))",
                   value: "\(p.fish.count)"),
+            .init(label: "분위기 (mood)",
+                  formula: "studyRatio 구간 → deepStudy/study/balanced/active/deepActive",
+                  value: p.mood.rawValue),
+            .init(label: "마스코트",
+                  formula: "ratio ≥ 0.58 → 거북 | 0.42..0.58 → 문어 | < 0.42 → 게",
+                  value: p.mascot.rawValue),
+            .init(label: "거품 수",
+                  formula: "min(10, 운동 분 ÷ 15)",
+                  value: "\(p.bubbles.count)"),
+            .init(label: "불가사리 수",
+                  formula: "min(6, 공부 분 ÷ 30)",
+                  value: "\(p.seabed.count)"),
+            .init(label: "하늘 토큰",
+                  formula: "study → 달, balanced → 구름, active → 태양",
+                  value: p.skyToken.rawValue),
             .init(label: "배경 색조 (HSL hue)",
-                  formula: "0.58 - 공부비율 × 0.05",
+                  formula: "mood.topHue",
                   value: String(format: "%.3f", p.bgHue)),
             .init(label: "활동 순서 시드",
                   formula: "FNV-1a(공부·운동 발생 순서) XOR 씨앗",

@@ -116,7 +116,8 @@ struct ShareTodayRecordSheet: View {
     private func shareOcean(_ plant: PlantModel) {
         let payload = AttachmentPayload.Ocean(
             seed: plant.seed, study: plant.studyMinutes,
-            workout: plant.workoutMinutes, name: plant.name
+            workout: plant.workoutMinutes, name: plant.name,
+            sequenceHash: plant.nutrients.sequenceHash
         )
         share(kind: .oceanSnapshot,
               summary: "내 바다 · 공부 \(plant.studyMinutes)분 / 운동 \(plant.workoutMinutes)분",

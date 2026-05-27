@@ -44,16 +44,17 @@ extension FirestoreSyncService {
 
     // MARK: - Inbox: all my groups (incl. DMs)
 
-    /// Subscribes to every group whose `memberCodes` contains my friendCode —
-    /// including 1:1 DM groups created by the *other* person. New/updated
-    /// groups are mirrored into local SwiftData, and each one gets a message
-    /// listener so an incoming DM lands as an unread thread without me having
-    /// to open it first. This is what makes "친구가 먼저 말 걸기"가 동작.
-    func startListeningMyGroups(myFriendCode: String, context: ModelContext) {
-        guard Auth.auth().currentUser != nil, !myFriendCode.isEmpty else { return }
+    /// Subscribes to every group whose `memberUids` contains my auth uid —
+    /// including 1:1 DM groups created by the *other* person. Keyed on uid (not
+    /// friendCode) so it matches the member-only `list` rule: you can only
+    /// enumerate groups you actually belong to. New/updated groups are mirrored
+    /// into local SwiftData, and each gets a message listener so an incoming DM
+    /// lands as an unread thread without me opening it. ("친구가 먼저 말 걸기".)
+    func startListeningMyGroups(context: ModelContext) {
+        guard let myUid = uid else { return }
         myGroupsListener?.remove()
         myGroupsListener = db.collection("groups")
-            .whereField("memberCodes", arrayContains: myFriendCode)
+            .whereField("memberUids", arrayContains: myUid)
             .addSnapshotListener { [weak self] snap, error in
                 if let error {
                     Persistence.log(error, context: "firestore.myGroupsListener")
@@ -83,16 +84,18 @@ extension FirestoreSyncService {
             let code = data["code"] as? String ?? ""
             let name = data["name"] as? String ?? "그룹"
             let members = data["memberCodes"] as? [String] ?? []
+            let memberUids = data["memberUids"] as? [String] ?? []
 
             let predicate = #Predicate<StudyGroupModel> { $0.id == gid }
             if let existing = try? context.fetch(FetchDescriptor(predicate: predicate)).first {
                 existing.memberCodes = members
+                existing.memberUids = memberUids
                 if existing.name != name, !code.hasPrefix(SocialService.directMessageCodePrefix) {
                     existing.name = name
                 }
             } else {
                 context.insert(StudyGroupModel(
-                    id: gid, code: code, name: name, memberCodes: members
+                    id: gid, code: code, name: name, memberCodes: members, memberUids: memberUids
                 ))
             }
             // Attach a message listener to this group if not already watching.
@@ -131,11 +134,16 @@ extension FirestoreSyncService {
             let data = change.document.data()
             guard let code = data["friendCode"] as? String else { continue }
             let nickname = data["nickname"] as? String ?? "친구"
+            let serverUID = data["uid"] as? String ?? ""
             let predicate = #Predicate<FriendProfileModel> { $0.friendCode == code }
             if let existing = try? context.fetch(FetchDescriptor(predicate: predicate)).first {
                 // Refresh nickname in case the other side renamed.
                 if existing.nickname.hasPrefix("(데모)") || existing.nickname != nickname {
                     existing.nickname = nickname
+                }
+                // Backfill the friend's auth UID for member-based DM security.
+                if existing.serverUID.isEmpty, !serverUID.isEmpty {
+                    existing.serverUID = serverUID
                 }
                 continue
             }
@@ -143,7 +151,8 @@ extension FirestoreSyncService {
                 friendCode: code,
                 nickname: nickname,
                 mascotSpecies: .cat,
-                mascotStage: 0
+                mascotStage: 0,
+                serverUID: serverUID
             ))
         }
         Persistence.save({ try context.save() }, context: "firestore.applyIncomingFriends")
@@ -170,24 +179,19 @@ extension FirestoreSyncService {
         }
     }
 
-    func lookupGroup(byCode code: String) async -> LookupOutcome<RemoteGroup> {
+    /// Resolves a join code → group id via the public `groupCodes/{code}` doc.
+    /// A non-member can't read the group doc itself (member-only get), so this
+    /// lookup is the only way in. The group's name/roster arrive later via the
+    /// inbox listener once the self-join lands and we become a member.
+    func lookupGroupCode(_ code: String) async -> LookupOutcome<UUID> {
         guard Auth.auth().currentUser != nil else { return .error(.unauthenticated) }
         do {
-            let snap = try await db.collection("groups")
-                .whereField("code", isEqualTo: code)
-                .limit(to: 1)
-                .getDocuments()
-            guard let doc = snap.documents.first else { return .notFound }
-            let idString = doc.data()["id"] as? String ?? doc.documentID
-            guard let uuid = UUID(uuidString: idString) else { return .notFound }
-            return .found(RemoteGroup(
-                id: uuid,
-                code: code,
-                name: doc.data()["name"] as? String ?? "그룹",
-                memberCodes: doc.data()["memberCodes"] as? [String] ?? []
-            ))
+            let snap = try await db.collection("groupCodes").document(code).getDocument()
+            guard snap.exists, let gidString = snap.data()?["gid"] as? String,
+                  let gid = UUID(uuidString: gidString) else { return .notFound }
+            return .found(gid)
         } catch {
-            Persistence.log(error, context: "firestore.lookupGroup")
+            Persistence.log(error, context: "firestore.lookupGroupCode")
             return .error(.from(error))
         }
     }

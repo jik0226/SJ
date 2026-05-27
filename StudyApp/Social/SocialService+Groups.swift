@@ -20,10 +20,12 @@ extension SocialService {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SocialError.emptyGroupName }
         let me = me(in: context)
+        let myUid = AuthBootstrap.shared.currentUID ?? ""
         let group = StudyGroupModel(
             code: GroupCode.generate(),
             name: trimmed,
-            memberCodes: [me.friendCode]
+            memberCodes: [me.friendCode],
+            memberUids: myUid.isEmpty ? [] : [myUid]
         )
         context.insert(group)
         guard Persistence.save({ try context.save() }, context: "group.create") != nil else {
@@ -42,6 +44,21 @@ extension SocialService {
             Persistence.log(error, context: "firestore.publishGroup.create")
             throw SocialError.serverPublishFailed
         }
+        // Register the join-code → gid mapping so others can resolve the code
+        // without reading the (member-only) group doc. REQUIRED for A안 — a room
+        // no one can join by code is worse than no room — so a failure rolls the
+        // whole creation back (delete the server doc + local row).
+        do {
+            try await FirestoreSyncService.shared.publishGroupCode(
+                code: group.code, gid: group.id.uuidString
+            )
+        } catch {
+            try? await FirestoreSyncService.shared.updateGroupMembers(groupId: group.id, members: [])
+            context.delete(group)
+            Persistence.save({ try context.save() }, context: "group.create.code.rollback")
+            Persistence.log(error, context: "firestore.publishGroupCode.create")
+            throw SocialError.serverPublishFailed
+        }
         return group
     }
 
@@ -53,51 +70,51 @@ extension SocialService {
         let code = GroupCode.sanitize(raw)
         guard GroupCode.isValid(code) else { throw SocialError.invalidGroupCode }
         let meRow = me(in: context)
+        guard let myUid = AuthBootstrap.shared.currentUID else { throw SocialError.serverPublishFailed }
 
-        // Local-first lookup so a previously-seen group joins instantly.
+        // Local-first: already joined this room. Re-assert membership
+        // (idempotent self-join) so a legacy row predating memberUids heals.
         let predicate = #Predicate<StudyGroupModel> { $0.code == code }
-        let descriptor = FetchDescriptor<StudyGroupModel>(predicate: predicate)
-        if let group = try context.fetch(descriptor).first {
-            if !group.memberCodes.contains(meRow.friendCode) {
-                group.memberCodes.append(meRow.friendCode)
-                Persistence.save({ try context.save() }, context: "group.join.local")
-                try? await FirestoreSyncService.shared.publishGroup(group)
-            }
+        if let group = try context.fetch(FetchDescriptor(predicate: predicate)).first {
+            try? await FirestoreSyncService.shared.joinGroupAddSelf(
+                groupId: group.id, myUid: myUid, myCode: meRow.friendCode
+            )
+            if !group.memberCodes.contains(meRow.friendCode) { group.memberCodes.append(meRow.friendCode) }
+            if !group.memberUids.contains(myUid) { group.memberUids.append(myUid) }
+            Persistence.save({ try context.save() }, context: "group.join.local")
             return group
         }
 
-        // Server-backed lookup: mirror the remote group into local storage so
-        // GroupListView can render it offline next time.
-        if AuthBootstrap.shared.isSignedIn {
-            switch await FirestoreSyncService.shared.lookupGroup(byCode: code) {
-                case .notFound:
-                    throw SocialError.groupNotFound
-                case .error(let err):
-                    throw SocialError.lookupError(err)
-                case .found(let remote):
-                    let mirrored = StudyGroupModel(
-                        id: remote.id,
-                        code: remote.code,
-                        name: remote.name,
-                        memberCodes: Array(Set(remote.memberCodes + [meRow.friendCode]))
+        // Resolve code → gid via the public groupCodes lookup — we can't read
+        // the member-only group doc until we've joined. The real name/roster
+        // arrive via the inbox listener once the self-join lands.
+        switch await FirestoreSyncService.shared.lookupGroupCode(code) {
+            case .notFound:
+                throw SocialError.groupNotFound
+            case .error(let err):
+                throw SocialError.lookupError(err)
+            case .found(let gid):
+                let joined = StudyGroupModel(
+                    id: gid, code: code, name: "그룹 \(code)",
+                    memberCodes: [meRow.friendCode], memberUids: [myUid]
+                )
+                context.insert(joined)
+                guard Persistence.save({ try context.save() }, context: "group.join.remote") != nil else {
+                    context.delete(joined)
+                    throw SocialError.saveFailed
+                }
+                do {
+                    try await FirestoreSyncService.shared.joinGroupAddSelf(
+                        groupId: gid, myUid: myUid, myCode: meRow.friendCode
                     )
-                    context.insert(mirrored)
-                    guard Persistence.save({ try context.save() }, context: "group.join.remote") != nil else {
-                        context.delete(mirrored)
-                        throw SocialError.saveFailed
-                    }
-                    do {
-                        try await FirestoreSyncService.shared.publishGroup(mirrored)
-                    } catch {
-                        context.delete(mirrored)
-                        Persistence.save({ try context.save() }, context: "group.join.rollback")
-                        Persistence.log(error, context: "firestore.publishGroup.join")
-                        throw SocialError.serverPublishFailed
-                    }
-                    return mirrored
-            }
+                } catch {
+                    context.delete(joined)
+                    Persistence.save({ try context.save() }, context: "group.join.rollback")
+                    Persistence.log(error, context: "firestore.joinGroupAddSelf")
+                    throw SocialError.serverPublishFailed
+                }
+                return joined
         }
-        throw SocialError.groupNotFound
     }
 
     // MARK: - Direct messages (1:1 channels)
@@ -115,21 +132,45 @@ extension SocialService {
         let pair = [meRow.friendCode, friend.friendCode].sorted()
         let groupID = DirectMessageKey.deterministicID(forSortedCodes: pair)
 
+        // Resolve the friend's auth UID so the DM doc carries BOTH members'
+        // UIDs from creation. The hardened rules forbid self-join into DMs, so
+        // the second party must already be a member — which only holds if the
+        // creator seeds memberUids with the friend's UID too. Fetch + persist
+        // it once for legacy friend rows that predate the field.
+        var friendUID = friend.serverUID
+        if friendUID.isEmpty {
+            if case .found(let remote) = await FirestoreSyncService.shared.lookupFriend(byCode: friend.friendCode) {
+                friendUID = remote.uid
+                friend.serverUID = remote.uid
+            }
+        }
+        let dmUids = friendUID.isEmpty ? [] : [friendUID]
+
         let predicate = #Predicate<StudyGroupModel> { $0.id == groupID }
         if let existing = try? context.fetch(FetchDescriptor(predicate: predicate)).first {
-            // Refresh memberCodes & name in case the friend renamed.
+            // Refresh memberCodes & name in case the friend renamed. Only
+            // overwrite memberUids when we actually resolved one — never clobber
+            // an existing DM's UIDs with an empty list (e.g. offline refresh).
             existing.memberCodes = pair
+            if !dmUids.isEmpty { existing.memberUids = dmUids }
             if existing.name != friend.nickname { existing.name = friend.nickname }
             Persistence.save({ try context.save() }, context: "dm.refresh")
             try? await FirestoreSyncService.shared.publishGroup(existing)
             return existing
         }
 
+        // A brand-new DM must carry the friend's UID — otherwise the locked
+        // self-join rule leaves the friend permanently unable to read it. Fail
+        // loud so the user retries once online instead of creating a dead
+        // thread that looks fine on our side but the friend can never open.
+        guard !dmUids.isEmpty else { throw SocialError.serverPublishFailed }
+
         let group = StudyGroupModel(
             id: groupID,
             code: directMessageCodePrefix + pair.joined(separator: "-"),
             name: friend.nickname,
-            memberCodes: pair
+            memberCodes: pair,
+            memberUids: dmUids
         )
         context.insert(group)
         guard Persistence.save({ try context.save() }, context: "dm.create") != nil else {

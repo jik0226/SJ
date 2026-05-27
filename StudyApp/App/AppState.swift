@@ -226,7 +226,7 @@ final class AppState {
             weekMinutes: weekStudyMinutes(context: context),
             streakDays: StreakService.currentLength,
             oceanSeed: plant?.seed,
-            oceanNutrients: plant.map { (study: $0.studyMinutes, workout: $0.workoutMinutes) },
+            oceanNutrients: plant.map { (study: $0.studyMinutes, workout: $0.workoutMinutes, sequenceHash: $0.nutrients.sequenceHash) },
             plannerTodaySlots: plannerSnapshot
         )
     }

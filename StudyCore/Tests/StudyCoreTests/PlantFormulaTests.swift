@@ -1,6 +1,8 @@
 // PlantFormulaTests — Ocean parameter contract.
 // The renderer relies on these counts/ranges; if formulas drift the canvas
-// silently degrades, so lock the boundary behavior.
+// silently degrades, so lock the boundary behavior. The full-equality
+// determinism test also guards the shared-chat-preview contract: a friend's
+// ocean is rebuilt from (seed, nutrients) and must match byte-for-byte.
 
 import XCTest
 @testable import StudyCore
@@ -38,16 +40,16 @@ final class PlantFormulaTests: XCTestCase {
         let nutrients = PlantNutrients(studyMinutes: 300, workoutMinutes: 60)
         let a = PlantFormula.parameters(seed: 42, nutrients: nutrients)
         let b = PlantFormula.parameters(seed: 42, nutrients: nutrients)
-        XCTAssertEqual(a.waves.count, b.waves.count)
-        XCTAssertEqual(a.fish.count, b.fish.count)
-        XCTAssertEqual(a.bgHue, b.bgHue, accuracy: 1e-9)
-        // Spot-check first wave for byte-level equality.
-        XCTAssertEqual(a.waves.first?.frequency, b.waves.first?.frequency)
-        XCTAssertEqual(a.waves.first?.phase, b.waves.first?.phase)
+        // Full struct equality locks every field — including the new mood,
+        // mascot, bubbles, and seabed — which is the contract the shared chat
+        // preview relies on to reconstruct an identical ocean from inputs.
+        XCTAssertEqual(a, b)
     }
 
-    func testStudyHeavyShiftsHueCooler() {
-        // bgHue = 0.58 - studyRatio * 0.05  → all-study should hit 0.53.
+    func testStudyVsWorkoutGivesDistinctMood() {
+        // The combination axis: study-heavy → deepStudy (cool indigo) and
+        // workout-heavy → deepActive (warm coral). They must yield visibly
+        // different moods, palettes, and mascots.
         let allStudy = PlantFormula.parameters(
             seed: seed,
             nutrients: PlantNutrients(studyMinutes: 120, workoutMinutes: 0)
@@ -56,7 +58,43 @@ final class PlantFormulaTests: XCTestCase {
             seed: seed,
             nutrients: PlantNutrients(studyMinutes: 0, workoutMinutes: 120)
         )
-        XCTAssertLessThan(allStudy.bgHue, allWorkout.bgHue, "study-heavy bgHue must be cooler (lower hue) than workout-heavy")
+        XCTAssertEqual(allStudy.mood, .deepStudy)
+        XCTAssertEqual(allWorkout.mood, .deepActive)
+        XCTAssertNotEqual(allStudy.bgHue, allWorkout.bgHue)
+        XCTAssertNotEqual(allStudy.mascot, allWorkout.mascot, "study → turtle, workout → crab")
+    }
+
+    func testMoodBucketsByStudyRatio() {
+        func mood(study: Int, workout: Int) -> OceanMood {
+            PlantFormula.parameters(
+                seed: seed,
+                nutrients: PlantNutrients(studyMinutes: study, workoutMinutes: workout)
+            ).mood
+        }
+        XCTAssertEqual(mood(study: 100, workout: 0), .deepStudy)   // ratio 1.0
+        XCTAssertEqual(mood(study: 0, workout: 100), .deepActive)  // ratio 0.0
+        XCTAssertEqual(mood(study: 50, workout: 50), .balanced)    // ratio 0.5
+    }
+
+    func testMascotMatchesDominantActivity() {
+        func mascot(study: Int, workout: Int) -> OceanMascot {
+            PlantFormula.parameters(
+                seed: seed,
+                nutrients: PlantNutrients(studyMinutes: study, workoutMinutes: workout)
+            ).mascot
+        }
+        XCTAssertEqual(mascot(study: 100, workout: 0), .turtle)   // study-dominant
+        XCTAssertEqual(mascot(study: 50, workout: 50), .octopus)  // balanced
+        XCTAssertEqual(mascot(study: 0, workout: 100), .crab)     // active-dominant
+    }
+
+    func testBubblesScaleWithWorkoutAndSeabedWithStudy() {
+        let p = PlantFormula.parameters(
+            seed: seed,
+            nutrients: PlantNutrients(studyMinutes: 90, workoutMinutes: 45)
+        )
+        XCTAssertEqual(p.bubbles.count, min(10, 45 / 15), "workout minutes drive bubbles")
+        XCTAssertEqual(p.seabed.count, min(6, 90 / 30), "study minutes drive seabed starfish")
     }
 
     func testActivityOrderChangesOcean() {
@@ -108,7 +146,8 @@ final class PlantFormulaTests: XCTestCase {
             seed: seed,
             nutrients: PlantNutrients(studyMinutes: 200, workoutMinutes: 100)
         )
-        // 6 base lines (incl. activity-order seed) + 1 line per wave layer.
-        XCTAssertEqual(lines.count, 6 + p.waves.count)
+        // 11 base lines (wave count/amp/freq, fish, mood, mascot, bubbles,
+        // starfish, sky, bgHue, activity-order seed) + 1 line per wave layer.
+        XCTAssertEqual(lines.count, 11 + p.waves.count)
     }
 }

@@ -49,5 +49,10 @@ enum WidgetSyncService {
         defaults?.set(plant.seed, forKey: "plant.seed")
         defaults?.set(plant.studyMinutes, forKey: "plant.studyMinutes")
         defaults?.set(plant.workoutMinutes, forKey: "plant.workoutMinutes")
+        // Persist the activity-order hash as a string — a UInt64 can exceed
+        // Int64.max and won't round-trip through UserDefaults' number storage.
+        // Without it the widget rebuilds seed^0 and draws a different ocean
+        // than the app body and chat share.
+        defaults?.set(String(plant.nutrients.sequenceHash), forKey: "plant.sequenceHash")
     }
 }

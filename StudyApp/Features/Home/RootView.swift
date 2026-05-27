@@ -69,10 +69,7 @@ struct RootView: View {
                 // Inbox: watch every group I'm a member of (incl. DMs others
                 // started) so incoming chats arrive as unread threads without
                 // me opening them first.
-                let myCode = SocialService.me(in: modelContext).friendCode
-                FirestoreSyncService.shared.startListeningMyGroups(
-                    myFriendCode: myCode, context: modelContext
-                )
+                FirestoreSyncService.shared.startListeningMyGroups(context: modelContext)
                 // Re-publish summary after pull so the public doc reflects any
                 // remote data that arrived first on this device.
                 appState.publishPublicSnapshot(context: modelContext)

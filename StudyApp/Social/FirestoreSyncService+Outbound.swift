@@ -49,7 +49,7 @@ extension FirestoreSyncService {
         weekMinutes: Int,
         streakDays: Int,
         oceanSeed: Int?,
-        oceanNutrients: (study: Int, workout: Int)?,
+        oceanNutrients: (study: Int, workout: Int, sequenceHash: UInt64)?,
         plannerTodaySlots: [Int: String]?
     ) {
         guard let ref = userRef() else { return }
@@ -64,10 +64,14 @@ extension FirestoreSyncService {
             data["oceanSeed"] = seed
             data["oceanStudy"] = n.study
             data["oceanWorkout"] = n.workout
+            // UInt64 as a string — Firestore numbers are Int64 and would lose
+            // the high bit. A consumer parses it back for an identical ocean.
+            data["oceanSequenceHash"] = String(n.sequenceHash)
         } else {
             data["oceanSeed"] = FieldValue.delete()
             data["oceanStudy"] = FieldValue.delete()
             data["oceanWorkout"] = FieldValue.delete()
+            data["oceanSequenceHash"] = FieldValue.delete()
         }
         // Planner: map slotIndex -> color hex. Subject name intentionally not
         // shared — friends only see the color pattern.
@@ -191,82 +195,4 @@ extension FirestoreSyncService {
         }
     }
 
-    // MARK: - Mutual friendship
-
-    /// Writes the friendship to *both* users' `users/{uid}/friends/{otherUid}`
-    /// subcollections so the other side sees the connection without any
-    /// manual accept step. PoC trade-off: any authenticated user can write
-    /// into another user's friends list — fine until we add accept/reject.
-    func publishMutualFriendship(
-        meUid: String, meCode: String, meNick: String,
-        otherUid: String, otherCode: String, otherNick: String
-    ) async throws {
-        let outgoing: [String: Any] = [
-            "uid": otherUid, "friendCode": otherCode, "nickname": otherNick,
-            "createdAt": FieldValue.serverTimestamp(),
-        ]
-        let incoming: [String: Any] = [
-            "uid": meUid, "friendCode": meCode, "nickname": meNick,
-            "createdAt": FieldValue.serverTimestamp(),
-        ]
-        let usersRef = db.collection("users")
-        try await usersRef.document(meUid).collection("friends")
-            .document(otherUid).setData(outgoing, merge: true)
-        try await usersRef.document(otherUid).collection("friends")
-            .document(meUid).setData(incoming, merge: true)
-    }
-
-    /// Removes the friendship from *only the caller's* side. The other user
-    /// keeps the row in their list; this matches Kakao/Line semantics where
-    /// "delete friend" is a personal hide, not a mutual unlink.
-    func deleteFriendship(meUid: String, otherUid: String) async throws {
-        try await db.collection("users").document(meUid)
-            .collection("friends").document(otherUid).delete()
-    }
-
-    /// Removes a user from a group's memberCodes server-side. When the last
-    /// member leaves the group doc itself is deleted to avoid orphans.
-    func updateGroupMembers(groupId: UUID, members: [String]) async throws {
-        let ref = db.collection("groups").document(groupId.uuidString)
-        if members.isEmpty {
-            try await ref.delete()
-        } else {
-            try await ref.setData(["memberCodes": members], merge: true)
-        }
-    }
-
-    /// Awaitable variant — callers (createGroup / joinGroup) need to know
-    /// the server doc actually landed before another device can join by code.
-    /// Fire-and-forget here would race the user re-typing the code on the
-    /// other phone before publish completes.
-    func publishGroup(_ group: StudyGroupModel) async throws {
-        guard Auth.auth().currentUser?.uid != nil else {
-            throw FirestoreSyncError.notSignedIn
-        }
-        let id = group.id.uuidString
-        let data: [String: Any] = [
-            "id": id, "code": group.code, "name": group.name,
-            "memberCodes": group.memberCodes,
-            "updatedAt": FieldValue.serverTimestamp(),
-        ]
-        try await db.collection("groups").document(id).setData(data, merge: true)
-    }
-
-    func publishMessage(_ msg: ChatMessageModel) async throws {
-        guard uid != nil else { throw FirestoreSyncError.notSignedIn }
-        let data: [String: Any] = [
-            "id": msg.id.uuidString,
-            "groupId": msg.groupId.uuidString,
-            "senderFriendCode": msg.senderFriendCode,
-            "text": msg.text,
-            "sentAt": msg.sentAt.timeIntervalSince1970,
-            "attachedKind": msg.attachedKindRaw as Any,
-            "attachedSummary": msg.attachedRecordSummary as Any,
-            "attachedPayload": msg.attachedPayloadJSON as Any,
-        ]
-        let gid = msg.groupId.uuidString
-        let mid = msg.id.uuidString
-        try await db.collection("chats").document(gid)
-            .collection("messages").document(mid).setData(data, merge: true)
-    }
 }
