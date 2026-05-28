@@ -72,6 +72,14 @@ targets:
         # is auto-resolved at sign time (simulator uses a synthetic prefix).
         keychain-access-groups:
           - $(AppIdentifierPrefix)co.autopus.study
+        # HealthKit — HealthService reads workout/step samples and writes back
+        # run sessions, gated by NSHealthShare/UpdateUsageDescription. Without
+        # this entitlement the authorization request fails on real devices and
+        # App Review rejects. (Clinical-records access not needed → no
+        # `.access` array.) Requires the paid Apple Developer Program; with
+        # Automatic signing Xcode adds the HealthKit capability to the App ID
+        # on the next device build/archive.
+        com.apple.developer.healthkit: true
     dependencies:
       - package: StudyCore
         product: StudyCore
