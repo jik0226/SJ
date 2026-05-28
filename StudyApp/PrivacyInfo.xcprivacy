@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      SJ(Study J) — App target privacy manifest.
+
+      We don't track users across apps/sites and use no third-party
+      advertising/analytics SDKs. The data we COLLECT (i.e., send off-device to
+      our Firebase backend) is the social-graph + chat content needed for the
+      friend-chat feature. On-device-only signals (precise location for
+      running, HealthKit, birthdate for the under-14 gate) are NOT collected
+      in the manifest sense — they never leave the device.
+
+      Firebase's frameworks ship their own PrivacyInfo manifests for their
+      direct API usage; this file declares ONLY this app's own behavior.
+    -->
+
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <!--
+              UserDefaults — PrivacyPreferences (per-field opt-in toggles) and
+              WidgetSyncService (App Group bridge to the widget timeline). All
+              reads/writes stay within this app / its app group.
+            -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <dict>
+            <!--
+              Firebase Auth UID + 6-character friendCode — both identify the
+              user across devices and to friends in chat/groups.
+            -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Display nickname shown to friends. -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeName</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <!--
+              User-generated content stored remotely:
+                - chat messages (1:1 DM + group rooms)
+                - shared achievements (ocean snapshot, planner, study/run
+                  summaries) that the user opts to share with friends
+                - the user's own backup of study/run/planner/D-Day entries
+                  in their private subtree
+            -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

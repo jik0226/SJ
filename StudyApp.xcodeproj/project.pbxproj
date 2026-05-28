@@ -43,6 +43,7 @@
 		4E648B3B22325E4718C7085B /* AppModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6EB52CCDF33E604A1BE207 /* AppModelContainer.swift */; };
 		4FE5E30A68C5E7189EF76C45 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD17EF30BCA0EC5CE81AD05 /* PrivacySettingsView.swift */; };
 		5810C3FAB4D05D53831D2957 /* RunSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F07E8929989A593D1DEE341 /* RunSessionModel.swift */; };
+		5B88CF3582CC38752C3289FC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C41576386CAB2E85C9DF56B2 /* PrivacyInfo.xcprivacy */; };
 		5D7F16F5275F4B19ABAEC2BA /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09AD417966740D6845B52DE /* TimerActivityAttributes.swift */; };
 		5EE17FC699578F722345C216 /* TodayStudyTimeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C60EB6809EEE88D440E96CE5 /* TodayStudyTimeWidget.swift */; };
 		6162EEEEF377533103D49E3D /* ScreenLockObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 585BCE6319745655DD12B13E /* ScreenLockObserver.swift */; };
@@ -96,6 +97,7 @@
 		DB0261FBCB04D5A9CE17770A /* StudyGroupModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F41E6DED0CED2F63DA9205B8 /* StudyGroupModel.swift */; };
 		DFB2661634411EB943146ACF /* FirestoreSyncService+Inbound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E05A02D6A6098718BE5FEAF /* FirestoreSyncService+Inbound.swift */; };
 		E3178E726D79D8858E5BB777 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE05ADE95490B581BF0E81F /* AppState.swift */; };
+		E952D1ACE6C7CB553DDD264E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9B0CC04CC021276F1089AE35 /* PrivacyInfo.xcprivacy */; };
 		EB210488471E64673A210603 /* SocialService+Friends.swift in Sources */ = {isa = PBXBuildFile; fileRef = C887FE09965B4FC0D17B0BFA /* SocialService+Friends.swift */; };
 		EB6E43E6D04B58C2D1FC4F6A /* FriendProfileModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5218B21BDFE80AE71D65DD73 /* FriendProfileModel.swift */; };
 		EFAE0F2974B57C400E17B145 /* FirestoreSyncService+OutboundSocial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09AA775DFFF61A6A39DCD190 /* FirestoreSyncService+OutboundSocial.swift */; };
@@ -191,6 +193,7 @@
 		93CDF5EFEA6B90A1B1410661 /* FriendCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendCode.swift; sourceTree = "<group>"; };
 		9582CA213BE36829B6873972 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		99AF65D90DF69A94C26AD30E /* RecoveryState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryState.swift; sourceTree = "<group>"; };
+		9B0CC04CC021276F1089AE35 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9BA68F7DEC5DEDA9D8559C8E /* PlantProgressService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlantProgressService.swift; sourceTree = "<group>"; };
 		9CBF95BFB4B6A66F59223123 /* DailyPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyPageView.swift; sourceTree = "<group>"; };
 		9FAF053FBD6C500BC8BCDEE6 /* ServerMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMode.swift; sourceTree = "<group>"; };
@@ -204,6 +207,7 @@
 		B60FDB63C6B3A2D13B01EB14 /* BackgroundGuardAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundGuardAdapter.swift; sourceTree = "<group>"; };
 		B826376FACB4F4D61DDB3C5E /* CallObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallObserver.swift; sourceTree = "<group>"; };
 		C09AD417966740D6845B52DE /* TimerActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerActivityAttributes.swift; sourceTree = "<group>"; };
+		C41576386CAB2E85C9DF56B2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C60EB6809EEE88D440E96CE5 /* TodayStudyTimeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayStudyTimeWidget.swift; sourceTree = "<group>"; };
 		C887FE09965B4FC0D17B0BFA /* SocialService+Friends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SocialService+Friends.swift"; sourceTree = "<group>"; };
 		C91BB6E47D33892547ADA2DA /* FriendDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendDetailView.swift; sourceTree = "<group>"; };
@@ -286,6 +290,7 @@
 			children = (
 				801E368A78D78F8667EBC730 /* Assets.xcassets */,
 				E594176EAA467C3BD58FA040 /* GoogleService-Info.plist */,
+				C41576386CAB2E85C9DF56B2 /* PrivacyInfo.xcprivacy */,
 				B0A93EDA1374501382D8D19D /* App */,
 				5D0C79FD3FDB34D90DD087B2 /* Background */,
 				434164B0512923EAE6121CBD /* CloudKit */,
@@ -487,6 +492,7 @@
 			children = (
 				CB6561D6346129E11BE7CBCD /* DDayWidget.swift */,
 				7E1D4CBDB645930E6ED090A2 /* PlantWidget.swift */,
+				9B0CC04CC021276F1089AE35 /* PrivacyInfo.xcprivacy */,
 				385DF70B92652C6650F390FB /* StudyWidgetsBundle.swift */,
 				4FE6E7F3E387DFA348992E53 /* TimerLiveActivity.swift */,
 				C60EB6809EEE88D440E96CE5 /* TodayStudyTimeWidget.swift */,
@@ -576,6 +582,7 @@
 			buildConfigurationList = A5BE85E29F9B77A7402F2145 /* Build configuration list for PBXNativeTarget "StudyWidgets" */;
 			buildPhases = (
 				589F848A3C93F4CEB55CF6CB /* Sources */,
+				77AF0C78D889211EF1E69F00 /* Resources */,
 				D20C213A09877B157F9EB0A7 /* Frameworks */,
 			);
 			buildRules = (
@@ -659,12 +666,21 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		77AF0C78D889211EF1E69F00 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E952D1ACE6C7CB553DDD264E /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E3AE03D09FF2DD3A8971CBE5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				353F3CA2BBC58901B1E0FABD /* Assets.xcassets in Resources */,
 				6AA9E8F5F02630688A3CFAC4 /* GoogleService-Info.plist in Resources */,
+				5B88CF3582CC38752C3289FC /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
