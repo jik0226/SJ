@@ -58,6 +58,8 @@ struct RootView: View {
             }
             guard !didFirstSync else { return }
             didFirstSync = true
+            // Demo content for screenshots/demos — no-op unless --seed-demo is set.
+            DemoContentSeeder.seedIfNeeded(context: modelContext)
             Task {
                 // Wait for anon auth to settle so private/* reads have a UID.
                 await AuthBootstrap.shared.signInIfNeeded()

@@ -12,7 +12,11 @@ import GoogleSignIn
 @main
 struct StudyApp: App {
     @State private var appState = AppState()
-    @State private var onboardingComplete: Bool = UserDefaults.standard.bool(forKey: "onboarding.complete")
+    // Skip onboarding for demo/screenshot builds so DemoContentSeeder (in
+    // RootView) runs. `--seed-demo` is never set on TestFlight/App Store builds.
+    @State private var onboardingComplete: Bool =
+        UserDefaults.standard.bool(forKey: "onboarding.complete")
+        || ProcessInfo.processInfo.arguments.contains("--seed-demo")
     @Environment(\.scenePhase) private var scenePhase
 
     init() {

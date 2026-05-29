@@ -52,6 +52,7 @@
 		62CD589E18359F8535481C4A /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 617A194778370487553915F8 /* GoogleSignIn */; };
 		65A628F95718999EB2956AA4 /* GroupChatView+Bubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 470D2B4ED0035D082EB95CEE /* GroupChatView+Bubble.swift */; };
 		66C66111E02DC56ECADA17DC /* RecoveryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99AF65D90DF69A94C26AD30E /* RecoveryState.swift */; };
+		68F4115CF03F755ECC15A050 /* DemoContentSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E19323D36D64065041036E /* DemoContentSeeder.swift */; };
 		699CB234817BC6ED61628851 /* StatsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200D94A1C489B02012E71159 /* StatsService.swift */; };
 		6AA9E8F5F02630688A3CFAC4 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = E594176EAA467C3BD58FA040 /* GoogleService-Info.plist */; };
 		6B8AB6D5C220ABF5B0350D83 /* PersistenceLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9B993041BD78DE91126E23 /* PersistenceLog.swift */; };
@@ -165,6 +166,7 @@
 		4191F54466FE819DA6C6F67C /* GroupSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupSheets.swift; sourceTree = "<group>"; };
 		426B15973DA1D3CD1D44B178 /* SubjectListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectListView.swift; sourceTree = "<group>"; };
 		470D2B4ED0035D082EB95CEE /* GroupChatView+Bubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GroupChatView+Bubble.swift"; sourceTree = "<group>"; };
+		47E19323D36D64065041036E /* DemoContentSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContentSeeder.swift; sourceTree = "<group>"; };
 		4B56916153B305FE923155CF /* PrivacyPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences.swift; sourceTree = "<group>"; };
 		4E2DDB0F70634E330916187F /* SocialService+Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SocialService+Chat.swift"; sourceTree = "<group>"; };
 		4F6584BE421B0F169236469A /* SceneGeometryObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneGeometryObserver.swift; sourceTree = "<group>"; };
@@ -481,6 +483,7 @@
 				3CE05ADE95490B581BF0E81F /* AppState.swift */,
 				DE00260B859FD206C3A438CC /* AuthBootstrap.swift */,
 				70C6C23C0EC41DA0938B4768 /* AuthBootstrap+Apple.swift */,
+				47E19323D36D64065041036E /* DemoContentSeeder.swift */,
 				30BC36B799B5853DC4E73D37 /* LiveActivityController.swift */,
 				E3617B563D6EF6AC1B695AA8 /* PomodoroSettings.swift */,
 				4B56916153B305FE923155CF /* PrivacyPreferences.swift */,
@@ -737,6 +740,7 @@
 				0BA75F2E93B8503906D4CA79 /* DailyPageModel.swift in Sources */,
 				849DF23DAF6B7C1520F809EC /* DailyPageView.swift in Sources */,
 				CE4B5D0C5994D540ED09FAF4 /* DeleteAccountView.swift in Sources */,
+				68F4115CF03F755ECC15A050 /* DemoContentSeeder.swift in Sources */,
 				19CE2F61F43C27D141522B51 /* DesignTokens.swift in Sources */,
 				0422A44A118BFA637351D1DD /* FirestoreSyncService+Deletion.swift in Sources */,
 				DFB2661634411EB943146ACF /* FirestoreSyncService+Inbound.swift in Sources */,
