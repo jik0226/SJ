@@ -4,6 +4,7 @@
 // reinstall the app or change phones.
 
 import SwiftUI
+import AuthenticationServices
 
 struct AccountLinkView: View {
     @State private var auth = AuthBootstrap.shared
@@ -36,13 +37,22 @@ struct AccountLinkView: View {
 
             if !auth.isLinked {
                 Section {
+                    SignInWithAppleButton(.continue) { request in
+                        auth.prepareAppleRequest(request)
+                    } onCompletion: { result in
+                        handleApple(result)
+                    }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 46)
+                    .disabled(isWorking)
+
                     Button {
                         connectGoogle()
                     } label: {
                         HStack {
                             Image(systemName: "g.circle.fill")
                                 .foregroundStyle(.red)
-                            Text(isWorking ? "Google 로그인 중…" : "Google 계정으로 연결")
+                            Text(isWorking ? "연결 중…" : "Google 계정으로 연결")
                                 .fontWeight(.semibold)
                             Spacer()
                             if isWorking { ProgressView() }
@@ -50,7 +60,7 @@ struct AccountLinkView: View {
                     }
                     .disabled(isWorking)
                 } footer: {
-                    Text("연결 후에도 친구코드와 모든 데이터는 그대로 유지됩니다. 다른 기기에서 같은 Google 계정으로 로그인하면 자동으로 복원돼요.")
+                    Text("연결 후에도 친구코드와 모든 데이터는 그대로 유지됩니다. 다른 기기에서 같은 계정으로 로그인하면 자동으로 복원돼요.")
                         .font(.caption)
                         .foregroundStyle(DT.Color.textSecondary)
                 }
@@ -64,11 +74,22 @@ struct AccountLinkView: View {
                 }
             }
 
-            Section("UID") {
+            Section {
                 Text(auth.currentUID ?? "—")
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .foregroundStyle(DT.Color.textSecondary)
+            } header: {
+                Text("고객지원용 ID")
+            }
+
+            Section {
+                NavigationLink {
+                    DeleteAccountView()
+                } label: {
+                    Text("계정 및 데이터 삭제")
+                        .foregroundStyle(DT.Color.error)
+                }
             }
         }
         .navigationTitle("계정 연결")
@@ -97,6 +118,29 @@ struct AccountLinkView: View {
                 errorMessage = error.localizedDescription
             }
             isWorking = false
+        }
+    }
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) {
+        errorMessage = nil
+        switch result {
+            case .success(let authorization):
+                isWorking = true
+                Task {
+                    do {
+                        try await auth.linkWithApple(authorization: authorization)
+                    } catch let error as AuthBootstrap.LinkError {
+                        errorMessage = error.errorDescription
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                    isWorking = false
+                }
+            case .failure(let error):
+                // A user-initiated cancel isn't an error worth surfacing.
+                if (error as? ASAuthorizationError)?.code != .canceled {
+                    errorMessage = error.localizedDescription
+                }
         }
     }
 }

@@ -33,6 +33,12 @@ final class AuthBootstrap {
     /// view footer so users understand why server features aren't working.
     private(set) var lastError: String?
 
+    /// Raw nonce generated for an in-flight Sign in with Apple request. It must
+    /// survive between the request callback (where its SHA256 is sent to Apple)
+    /// and the completion callback (where the raw value proves the token).
+    /// See AuthBootstrap+Apple.swift.
+    var currentAppleNonce: String?
+
     /// True iff the current user has linked their anon credential to a
     /// permanent provider (Google). When false, data is only as durable as
     /// the keychain on the current device.
@@ -76,6 +82,7 @@ final class AuthBootstrap {
         case notSignedIn
         case googleClientNotConfigured
         case googleTokenMissing
+        case appleTokenMissing
         case unknown(String)
 
         var errorDescription: String? {
@@ -86,10 +93,27 @@ final class AuthBootstrap {
                     return "Google 로그인이 Firebase 콘솔에서 활성화되지 않았어요. (관리자에게 문의)"
                 case .googleTokenMissing:
                     return "Google 토큰을 받지 못했어요. 다시 시도해주세요."
+                case .appleTokenMissing:
+                    return "Apple 인증 토큰을 받지 못했어요. 다시 시도해주세요."
                 case .unknown(let msg):
                     return msg
             }
         }
+    }
+
+    /// Resets local auth state and mints a fresh anonymous identity. Called
+    /// after account deletion so the app keeps working with an empty account.
+    func resetAndReSignInAnonymously() async {
+        currentUID = nil
+        lastError = nil
+        await signInIfNeeded()
+    }
+
+    /// Adopts a freshly linked UID. Exposed so the Apple-linking extension (a
+    /// separate file) can update the `private(set)` UID after `user.link`.
+    func noteLinkedUID(_ uid: String) {
+        currentUID = uid
+        lastError = nil
     }
 
     /// Promotes the anonymous user to a Google-backed account. The UID is

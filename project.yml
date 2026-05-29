@@ -80,6 +80,11 @@ targets:
         # Automatic signing Xcode adds the HealthKit capability to the App ID
         # on the next device build/archive.
         com.apple.developer.healthkit: true
+        # Sign in with Apple — required by App Review guideline 4.8 because the
+        # app also offers Google account linking. Provides a privacy-preserving
+        # login option alongside Google. "Default" = standard Apple ID scope.
+        com.apple.developer.applesignin:
+          - Default
     dependencies:
       - package: StudyCore
         product: StudyCore
