@@ -648,11 +648,11 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					3F13F2B3A01850E953312923 = {
-						DevelopmentTeam = AKTKPWBG6K;
+						DevelopmentTeam = 7969XVQ86R;
 						ProvisioningStyle = Automatic;
 					};
 					D80C35A4C88159C36D4797B4 = {
-						DevelopmentTeam = AKTKPWBG6K;
+						DevelopmentTeam = 7969XVQ86R;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -893,7 +893,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = AKTKPWBG6K;
+				DEVELOPMENT_TEAM = 7969XVQ86R;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyApp/Info.plist;
@@ -921,7 +921,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = AKTKPWBG6K;
+				DEVELOPMENT_TEAM = 7969XVQ86R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -947,7 +947,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = AKTKPWBG6K;
+				DEVELOPMENT_TEAM = 7969XVQ86R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1031,7 +1031,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = AKTKPWBG6K;
+				DEVELOPMENT_TEAM = 7969XVQ86R;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StudyApp/Info.plist;

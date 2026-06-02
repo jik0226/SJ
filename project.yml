@@ -109,7 +109,7 @@ targets:
         # Free Apple ID signing: Xcode picks the cert + provisioning profile
         # automatically once you select your personal Team in the target's
         # Signing & Capabilities tab.
-        DEVELOPMENT_TEAM: "AKTKPWBG6K"
+        DEVELOPMENT_TEAM: "7969XVQ86R"
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
         # Simulator builds need ad-hoc signing so entitlements (notably
@@ -155,7 +155,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         SKIP_INSTALL: YES
-        DEVELOPMENT_TEAM: "AKTKPWBG6K"
+        DEVELOPMENT_TEAM: "7969XVQ86R"
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
         "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": YES
