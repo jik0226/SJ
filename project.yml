@@ -53,11 +53,8 @@ targets:
               - com.googleusercontent.apps.199420155803-ue5uvmo50ok1l5ona2rqbkcr074t75vs
         NSHealthShareUsageDescription: "운동 시간과 걸음수를 가져와 순공시간 통계에 반영합니다."
         NSHealthUpdateUsageDescription: "러닝·운동 기록을 건강 앱에 저장합니다."
-        NSLocationWhenInUseUsageDescription: "러닝 경로와 거리를 측정합니다. 운동 중에만 사용합니다."
-        NSLocationAlwaysAndWhenInUseUsageDescription: "러닝 도중 잠금화면 상태에서도 거리·페이스 측정을 이어가기 위해 위치를 사용합니다."
+        NSLocationWhenInUseUsageDescription: "러닝 경로와 거리를 측정합니다. 앱이 켜져 있는 동안에만 사용합니다."
         NSMotionUsageDescription: "걸음·페이스 측정에 사용합니다."
-        UIBackgroundModes:
-          - location
     entitlements:
       path: StudyApp/StudyApp.entitlements
       properties:
@@ -101,7 +98,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.autopus.study
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "2"
+        CURRENT_PROJECT_VERSION: "3"
         TARGETED_DEVICE_FAMILY: "1"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         SUPPORTS_MACCATALYST: NO
@@ -151,7 +148,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.autopus.study.widgets
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "2"
+        CURRENT_PROJECT_VERSION: "3"
         TARGETED_DEVICE_FAMILY: "1"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         SKIP_INSTALL: YES

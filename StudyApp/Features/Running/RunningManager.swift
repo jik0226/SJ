@@ -56,15 +56,13 @@ final class RunningManager: NSObject {
     }
 
     func requestAuthorizationIfNeeded() {
-        switch manager.authorizationStatus {
-            case .notDetermined:
-                manager.requestWhenInUseAuthorization()
-            case .authorizedWhenInUse:
-                // Upgrade to Always so we keep recording while the screen is off.
-                // The OS shows a follow-up sheet rather than denying outright.
-                manager.requestAlwaysAuthorization()
-            default:
-                break
+        // Foreground-only running: we never request Always and never enable
+        // background location updates. Running measures distance/route while
+        // the app is open; locking the screen or backgrounding pauses GPS.
+        // This keeps the app free of the `location` background mode, which App
+        // Review otherwise gates behind a per-submission demo video (2.5.4).
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
         }
     }
 
@@ -82,11 +80,6 @@ final class RunningManager: NSObject {
         startedAt = now
         currentSegmentStart = now
         state = .running
-        // Background updates require Always authorization at runtime AND the
-        // `location` background mode in Info.plist (added in project.yml).
-        if authStatus == .authorizedAlways {
-            manager.allowsBackgroundLocationUpdates = true
-        }
         manager.startUpdatingLocation()
         startTicker()
     }
@@ -113,7 +106,6 @@ final class RunningManager: NSObject {
         guard state == .running else { return }
         bankCurrentSegment()
         state = .paused
-        manager.allowsBackgroundLocationUpdates = false
         manager.stopUpdatingLocation()
         elapsedTimer?.invalidate()
         elapsedTimer = nil
@@ -125,12 +117,6 @@ final class RunningManager: NSObject {
         guard canStart else { return }
         currentSegmentStart = Date()
         state = .running
-        // Restore the background-tracking bit that pause() turned off,
-        // otherwise the lock-screen / Always-permission user loses GPS after
-        // every resume.
-        if authStatus == .authorizedAlways {
-            manager.allowsBackgroundLocationUpdates = true
-        }
         manager.startUpdatingLocation()
         startTicker()
     }
@@ -145,7 +131,6 @@ final class RunningManager: NSObject {
         guard state == .running || state == .paused else { return nil }
         bankCurrentSegment()
         let endAt = Date()
-        manager.allowsBackgroundLocationUpdates = false
         manager.stopUpdatingLocation()
         elapsedTimer?.invalidate()
         elapsedTimer = nil
@@ -244,12 +229,6 @@ extension RunningManager: CLLocationManagerDelegate {
             self.recomputeBanner()
             if status == .denied || status == .restricted, self.state == .running {
                 self.pause()
-            }
-            // If the user just granted Always while a run is already in
-            // progress, flip the background flag on now so the lock-screen
-            // recording starts immediately instead of after the next resume.
-            if status == .authorizedAlways, self.state == .running {
-                self.manager.allowsBackgroundLocationUpdates = true
             }
         }
     }
