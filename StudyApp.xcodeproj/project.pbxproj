@@ -46,6 +46,7 @@
 		4E648B3B22325E4718C7085B /* AppModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6EB52CCDF33E604A1BE207 /* AppModelContainer.swift */; };
 		4FE5E30A68C5E7189EF76C45 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD17EF30BCA0EC5CE81AD05 /* PrivacySettingsView.swift */; };
 		50D78CBA2525AECEE078CF0E /* OceanShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6CFE018AA03A8509B619E16 /* OceanShareCard.swift */; };
+		51F9B869F6CFC4F39DD83F96 /* PlantCanvasView+Decor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27B04E756C1AB563951E2E50 /* PlantCanvasView+Decor.swift */; };
 		5810C3FAB4D05D53831D2957 /* RunSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F07E8929989A593D1DEE341 /* RunSessionModel.swift */; };
 		5B88CF3582CC38752C3289FC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C41576386CAB2E85C9DF56B2 /* PrivacyInfo.xcprivacy */; };
 		5D7F16F5275F4B19ABAEC2BA /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09AD417966740D6845B52DE /* TimerActivityAttributes.swift */; };
@@ -155,6 +156,7 @@
 		200D94A1C489B02012E71159 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		260D674AAFFF2CF3DCEB3E0B /* ProfileHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileHubView.swift; sourceTree = "<group>"; };
 		2657E9D3C62A120830B883E2 /* PlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerView.swift; sourceTree = "<group>"; };
+		27B04E756C1AB563951E2E50 /* PlantCanvasView+Decor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlantCanvasView+Decor.swift"; sourceTree = "<group>"; };
 		2B588FF18EC26BF6747EA98C /* FirestoreSyncService+Listeners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FirestoreSyncService+Listeners.swift"; sourceTree = "<group>"; };
 		2F07E8929989A593D1DEE341 /* RunSessionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunSessionModel.swift; sourceTree = "<group>"; };
 		2FADF29E1B756D85F1379436 /* DDayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDayModel.swift; sourceTree = "<group>"; };
@@ -480,6 +482,7 @@
 				E6CFE018AA03A8509B619E16 /* OceanShareCard.swift */,
 				03F9D8744F41BB6656BC0548 /* PlantCanvasView.swift */,
 				0EF0610BD861FAFC7D0B8BAC /* PlantCanvasView+Creatures.swift */,
+				27B04E756C1AB563951E2E50 /* PlantCanvasView+Decor.swift */,
 				02C9CAACD40165797545881B /* PlantDetailView.swift */,
 			);
 			path = Plant;
@@ -779,6 +782,7 @@
 				9034740953B8C34ADBD0DD62 /* PlannerBlockModel.swift in Sources */,
 				EFC0B21F768F6C5B27E03844 /* PlannerView.swift in Sources */,
 				2476A8816E710E6797A99118 /* PlantCanvasView+Creatures.swift in Sources */,
+				51F9B869F6CFC4F39DD83F96 /* PlantCanvasView+Decor.swift in Sources */,
 				49BD1DDFDB5D2442CBB3C13F /* PlantCanvasView.swift in Sources */,
 				AC8CF67CB5B0EE729355D5CF /* PlantDetailView.swift in Sources */,
 				18148ED458CDAFDCAFC21329 /* PlantModel.swift in Sources */,
