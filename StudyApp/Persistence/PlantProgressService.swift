@@ -13,8 +13,10 @@ enum PlantProgressService {
         let minutes = session.totalSeconds / 60
         guard minutes > 0 else { return }
         guard let plant = ensurePlant(context: context) else { return }
+        let before = plant.parameters
         plant.addStudyMinutes(minutes)
         Persistence.save({ try context.save() }, context: "plant.studyNutrient")
+        publishMoment(before: before, plant: plant, minutes: minutes, kind: .study)
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
         FirestoreSyncService.shared.publishPlant(plant)
@@ -38,11 +40,26 @@ enum PlantProgressService {
         let minutes = session.totalSeconds / 60
         guard minutes > 0 else { return }
         guard let plant = ensurePlant(context: context) else { return }
+        let before = plant.parameters
         plant.addWorkoutMinutes(minutes)
         Persistence.save({ try context.save() }, context: "plant.workoutFromTimer")
+        publishMoment(before: before, plant: plant, minutes: minutes, kind: .workout)
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
         FirestoreSyncService.shared.publishPlant(plant)
+    }
+
+    /// Emits the "your ocean just changed" moment for the session-end sheet.
+    /// Only fires when the parameters visibly differ, so a short session that
+    /// changes nothing doesn't interrupt with an identical before/after.
+    private static func publishMoment(
+        before: OceanParameters, plant: PlantModel, minutes: Int, kind: ActivityEvent.Kind
+    ) {
+        let after = plant.parameters
+        guard before != after else { return }
+        OceanMomentCenter.shared.current = OceanMoment(
+            before: before, after: after, addedMinutes: minutes, kind: kind
+        )
     }
 
     /// Bonus nutrients when the user clears a 7-day streak. Split evenly

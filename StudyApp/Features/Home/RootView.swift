@@ -15,6 +15,9 @@ struct RootView: View {
 
     @State private var selection: RootTab = RootView.initialTab()
     @State private var didFirstSync = false
+    /// Session-end "your ocean changed" moments, presented app-wide so the
+    /// sheet survives the timer view collapsing back to the start hub.
+    @State private var momentCenter = OceanMomentCenter.shared
 
     @Query(filter: #Predicate<FriendProfileModel> { $0.isMe == true })
     private var mes: [FriendProfileModel]
@@ -52,6 +55,9 @@ struct RootView: View {
                 .tabItem { Label("더보기", systemImage: "ellipsis.circle.fill") }
         }
         .tint(DT.Color.primary)
+        .sheet(item: $momentCenter.current) { moment in
+            OceanMomentSheet(moment: moment)
+        }
         .onAppear {
             if appState.modelContext == nil {
                 appState.modelContext = modelContext

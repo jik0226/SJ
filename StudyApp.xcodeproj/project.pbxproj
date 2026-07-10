@@ -14,6 +14,7 @@
 		09E55A2B66E47C6831D135FA /* FirestoreSyncService+Outbound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71546A9BD6F517AEF115567A /* FirestoreSyncService+Outbound.swift */; };
 		0AC797DCDE16C41811865E06 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582CA213BE36829B6873972 /* RootView.swift */; };
 		0BA75F2E93B8503906D4CA79 /* DailyPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1861060885551FBDAC7502C1 /* DailyPageModel.swift */; };
+		0BD0521FF8A0DCA8C76A7CF0 /* OceanMomentCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1DC5B1946C54A65FD03EA6 /* OceanMomentCenter.swift */; };
 		0DAE5828B34A2CD93B32BC82 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614E5641F035B1DCEEE45303 /* HomeView.swift */; };
 		10573B629D22DC02C8AE9930 /* SubjectListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426B15973DA1D3CD1D44B178 /* SubjectListView.swift */; };
 		11DBBD20ADB0CC39831E18A6 /* FriendCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CDF5EFEA6B90A1B1410661 /* FriendCode.swift */; };
@@ -44,6 +45,7 @@
 		49BD1DDFDB5D2442CBB3C13F /* PlantCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F9D8744F41BB6656BC0548 /* PlantCanvasView.swift */; };
 		4E648B3B22325E4718C7085B /* AppModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6EB52CCDF33E604A1BE207 /* AppModelContainer.swift */; };
 		4FE5E30A68C5E7189EF76C45 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD17EF30BCA0EC5CE81AD05 /* PrivacySettingsView.swift */; };
+		50D78CBA2525AECEE078CF0E /* OceanShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6CFE018AA03A8509B619E16 /* OceanShareCard.swift */; };
 		5810C3FAB4D05D53831D2957 /* RunSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F07E8929989A593D1DEE341 /* RunSessionModel.swift */; };
 		5B88CF3582CC38752C3289FC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C41576386CAB2E85C9DF56B2 /* PrivacyInfo.xcprivacy */; };
 		5D7F16F5275F4B19ABAEC2BA /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09AD417966740D6845B52DE /* TimerActivityAttributes.swift */; };
@@ -64,6 +66,7 @@
 		7E092F25704CE633603E2185 /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A8C18872BCCEEF6AC9C864 /* HapticFeedback.swift */; };
 		7F855323FCA5E33483F81AB2 /* RunSummarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6421806FA804930F6CA1F946 /* RunSummarySheet.swift */; };
 		849DF23DAF6B7C1520F809EC /* DailyPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBF95BFB4B6A66F59223123 /* DailyPageView.swift */; };
+		860C6BF2555F422D615BAF08 /* OceanMomentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC45BB54545C10668E2B340 /* OceanMomentSheet.swift */; };
 		8AE089FA3DE065A1C239EDAA /* PlantWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1D4CBDB645930E6ED090A2 /* PlantWidget.swift */; };
 		8C56AF11E1D0745444CC14F3 /* FriendDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91BB6E47D33892547ADA2DA /* FriendDetailView.swift */; };
 		8FF0D76BB3013695CC1D05B1 /* TimerLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE6E7F3E387DFA348992E53 /* TimerLiveActivity.swift */; };
@@ -190,6 +193,7 @@
 		74A8C18872BCCEEF6AC9C864 /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		7605047D26BD2E77FA07A0D2 /* BlockGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockGridView.swift; sourceTree = "<group>"; };
 		782393FF4B4AADAC6324920A /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		7D1DC5B1946C54A65FD03EA6 /* OceanMomentCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanMomentCenter.swift; sourceTree = "<group>"; };
 		7DA37E78CA6AE9E5347B9444 /* SessionPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPersistence.swift; sourceTree = "<group>"; };
 		7DEC909F94090BE58B45749F /* OfflineNoticeBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineNoticeBanner.swift; sourceTree = "<group>"; };
 		7E05A02D6A6098718BE5FEAF /* FirestoreSyncService+Inbound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FirestoreSyncService+Inbound.swift"; sourceTree = "<group>"; };
@@ -223,6 +227,7 @@
 		C91BB6E47D33892547ADA2DA /* FriendDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendDetailView.swift; sourceTree = "<group>"; };
 		CA6EB52CCDF33E604A1BE207 /* AppModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelContainer.swift; sourceTree = "<group>"; };
 		CB6561D6346129E11BE7CBCD /* DDayWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDayWidget.swift; sourceTree = "<group>"; };
+		CDC45BB54545C10668E2B340 /* OceanMomentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanMomentSheet.swift; sourceTree = "<group>"; };
 		D0ACA52C75CBBB0C7E519E4C /* TimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		D1591F0ECCCEBA44DBC7E344 /* PomodoroSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroSettingsSheet.swift; sourceTree = "<group>"; };
 		D550F55EECFCBE843A94F5C5 /* AgeOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgeOnboardingView.swift; sourceTree = "<group>"; };
@@ -231,6 +236,7 @@
 		DE00260B859FD206C3A438CC /* AuthBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthBootstrap.swift; sourceTree = "<group>"; };
 		E3617B563D6EF6AC1B695AA8 /* PomodoroSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroSettings.swift; sourceTree = "<group>"; };
 		E594176EAA467C3BD58FA040 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		E6CFE018AA03A8509B619E16 /* OceanShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanShareCard.swift; sourceTree = "<group>"; };
 		E6E1FC3B63835A7453AFDBCD /* SocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialService.swift; sourceTree = "<group>"; };
 		EF24A6E67538E41DBE85F63A /* ChatInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInboxView.swift; sourceTree = "<group>"; };
 		F41E6DED0CED2F63DA9205B8 /* StudyGroupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyGroupModel.swift; sourceTree = "<group>"; };
@@ -469,6 +475,9 @@
 		AF46149BD9D8914B8772BEC9 /* Plant */ = {
 			isa = PBXGroup;
 			children = (
+				7D1DC5B1946C54A65FD03EA6 /* OceanMomentCenter.swift */,
+				CDC45BB54545C10668E2B340 /* OceanMomentSheet.swift */,
+				E6CFE018AA03A8509B619E16 /* OceanShareCard.swift */,
 				03F9D8744F41BB6656BC0548 /* PlantCanvasView.swift */,
 				0EF0610BD861FAFC7D0B8BAC /* PlantCanvasView+Creatures.swift */,
 				02C9CAACD40165797545881B /* PlantDetailView.swift */,
@@ -762,6 +771,9 @@
 				0DAE5828B34A2CD93B32BC82 /* HomeView.swift in Sources */,
 				A91BDCEA5EF4CED1C431B95F /* LiveActivityController.swift in Sources */,
 				368FA520D58A5C19F480543E /* NotificationsService.swift in Sources */,
+				0BD0521FF8A0DCA8C76A7CF0 /* OceanMomentCenter.swift in Sources */,
+				860C6BF2555F422D615BAF08 /* OceanMomentSheet.swift in Sources */,
+				50D78CBA2525AECEE078CF0E /* OceanShareCard.swift in Sources */,
 				FADCD86D837AC4D8E1A49794 /* OfflineNoticeBanner.swift in Sources */,
 				6B8AB6D5C220ABF5B0350D83 /* PersistenceLog.swift in Sources */,
 				9034740953B8C34ADBD0DD62 /* PlannerBlockModel.swift in Sources */,

@@ -13,11 +13,31 @@ struct PlantDetailView: View {
 
     @State private var draftName: String = ""
     @State private var sway: Double = 0
+    @State private var shareImage: UIImage?
 
     var body: some View {
         if let plant = plants.first {
             content(plant: plant)
                 .navigationTitle("내 바다")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            shareImage = OceanShareRenderer.render(plant: plant)
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel("바다 이미지 공유")
+                    }
+                }
+                .sheet(isPresented: Binding(
+                    get: { shareImage != nil },
+                    set: { if !$0 { shareImage = nil } }
+                )) {
+                    if let shareImage {
+                        ActivityShareSheet(items: [shareImage])
+                            .presentationDetents([.medium, .large])
+                    }
+                }
         } else {
             ProgressView()
         }
