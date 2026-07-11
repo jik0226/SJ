@@ -44,6 +44,15 @@ struct RunningView: View {
             .padding(.top, DT.Spacing.xl)
         }
         .background(DT.Color.surface.ignoresSafeArea())
+        .onAppear {
+            // Park any ocean-growth moment while this full-screen flow (and
+            // its RunSummarySheet) is on stage — presenting both at once
+            // clashes. It surfaces once, right after this screen closes.
+            OceanMomentCenter.shared.hold()
+        }
+        .onDisappear {
+            OceanMomentCenter.shared.release()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: closeAction) {

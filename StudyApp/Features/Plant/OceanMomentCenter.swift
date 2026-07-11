@@ -50,5 +50,27 @@ struct OceanMoment: Identifiable {
 final class OceanMomentCenter {
     static let shared = OceanMomentCenter()
     var current: OceanMoment?
+
+    /// While a full-screen flow (GPS running) is on stage, presenting the
+    /// growth sheet from RootView at the same time causes a presentation
+    /// clash. `hold()` parks the next moment; `release()` (on the flow's
+    /// dismissal) surfaces it once, sequentially.
+    @ObservationIgnored private var held = false
+    @ObservationIgnored private var pending: OceanMoment?
+
     private init() {}
+
+    func publish(_ moment: OceanMoment) {
+        if held { pending = moment } else { current = moment }
+    }
+
+    func hold() { held = true }
+
+    func release() {
+        held = false
+        if let queued = pending {
+            pending = nil
+            current = queued
+        }
+    }
 }

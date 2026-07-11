@@ -59,9 +59,9 @@ enum PlantProgressService {
     ) {
         let after = plant.parameters
         guard before != after else { return }
-        OceanMomentCenter.shared.current = OceanMoment(
+        OceanMomentCenter.shared.publish(OceanMoment(
             before: before, after: after, addedMinutes: minutes, kind: kind
-        )
+        ))
     }
 
     /// Bonus nutrients when the user clears a 7-day streak. Split evenly

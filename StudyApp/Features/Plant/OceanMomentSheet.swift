@@ -14,42 +14,47 @@ struct OceanMomentSheet: View {
     @State private var sway: Double = 0
 
     var body: some View {
-        VStack(spacing: DT.Spacing.lg) {
-            Text(revealed ? "바다가 변했어요!" : "\(kindLabel) 끝!")
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(DT.Color.textPrimary)
-                .padding(.top, DT.Spacing.xl)
-
-            Text("+\(moment.addedMinutes)분 \(kindLabel)")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, DT.Spacing.md)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(kindColor))
-
-            ZStack {
-                PlantCanvasView(parameters: moment.before, sway: sway)
-                    .opacity(revealed ? 0 : 1)
-                PlantCanvasView(parameters: moment.after, sway: sway)
-                    .opacity(revealed ? 1 : 0)
-            }
-            .frame(height: 220)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: DT.Radius.card))
-            .padding(.horizontal, DT.Spacing.lg)
-            .shadow(color: .black.opacity(0.08), radius: 10, y: 3)
-
-            VStack(spacing: DT.Spacing.xs) {
-                ForEach(moment.changeCallouts.prefix(2), id: \.self) { line in
-                    Text(line)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+        VStack(spacing: 0) {
+            // Scrollable content so small devices / large Dynamic Type never
+            // clip the button pinned below.
+            ScrollView {
+                VStack(spacing: DT.Spacing.lg) {
+                    Text(revealed ? "바다가 변했어요!" : "\(kindLabel) 끝!")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(DT.Color.textPrimary)
-                }
-            }
-            .opacity(revealed ? 1 : 0)
-            .frame(minHeight: 40)
+                        .padding(.top, DT.Spacing.xl)
 
-            Spacer(minLength: 0)
+                    Text("+\(moment.addedMinutes)분 \(kindLabel)")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, DT.Spacing.md)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(kindColor))
+
+                    ZStack {
+                        PlantCanvasView(parameters: moment.before, sway: sway)
+                            .opacity(revealed ? 0 : 1)
+                        PlantCanvasView(parameters: moment.after, sway: sway)
+                            .opacity(revealed ? 1 : 0)
+                    }
+                    .frame(height: 200)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: DT.Radius.card))
+                    .padding(.horizontal, DT.Spacing.lg)
+                    .shadow(color: .black.opacity(0.08), radius: 10, y: 3)
+
+                    VStack(spacing: DT.Spacing.xs) {
+                        ForEach(moment.changeCallouts.prefix(2), id: \.self) { line in
+                            Text(line)
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundStyle(DT.Color.textPrimary)
+                        }
+                    }
+                    .opacity(revealed ? 1 : 0)
+                    .frame(minHeight: 40)
+                }
+                .padding(.bottom, DT.Spacing.md)
+            }
 
             Button {
                 dismiss()

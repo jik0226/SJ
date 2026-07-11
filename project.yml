@@ -35,6 +35,10 @@ targets:
       path: StudyApp/Info.plist
       properties:
         CFBundleDisplayName: "SJ"
+        # Version must flow from build settings — a hardcoded value here made
+        # the shipped bundle stay 1.0 (1) while project.yml said 1.1 (4).
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations:
@@ -137,6 +141,8 @@ targets:
       path: StudyWidgets/Info.plist
       properties:
         CFBundleDisplayName: "SJ 위젯"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:

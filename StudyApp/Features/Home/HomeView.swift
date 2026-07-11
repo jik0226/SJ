@@ -23,6 +23,17 @@ struct HomeView: View {
     /// Bound by RootView so tapping the timer/planner card switches tabs.
     @Binding var selection: RootTab
 
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The wave animation only runs while the home tab is actually on screen
+    /// and the app is active — TabView keeps this view alive on other tabs,
+    /// and a 16fps Canvas redraw there is pure battery burn. Reduce Motion
+    /// stops it entirely.
+    private var swayActive: Bool {
+        selection == .home && scenePhase == .active && !reduceMotion
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -51,7 +62,7 @@ struct HomeView: View {
                         DDayCard(dday: pinned)
                     }
                     PlannerShortcutCard(onTap: { selection = .planner })
-                    OceanCard(plant: plants.first)
+                    OceanCard(plant: plants.first, swayActive: swayActive)
                     StreakCard()
                     Spacer(minLength: DT.Spacing.xxl)
                 }
@@ -80,6 +91,9 @@ struct HomeView: View {
 
 private struct OceanCard: View {
     let plant: PlantModel?
+    /// Driven by HomeView: true only when the home tab is on screen, the app
+    /// is active, and Reduce Motion is off.
+    let swayActive: Bool
     @State private var sway: Double = 0
 
     var body: some View {
@@ -119,8 +133,10 @@ private struct OceanCard: View {
             .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
         }
         .buttonStyle(.plain)
-        .task {
-            // Continuous gentle wave animation.
+        .task(id: swayActive) {
+            // Continuous gentle wave animation — restarted/cancelled whenever
+            // visibility conditions change (tab switch, background, motion).
+            guard swayActive else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 60_000_000)
                 await MainActor.run {
