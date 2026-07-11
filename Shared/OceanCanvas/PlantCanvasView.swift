@@ -22,6 +22,7 @@ struct PlantCanvasView: View {
             drawBokeh(context: context, size: size)
             drawWaves(context: context, size: size)
             drawSand(context: context, size: size)
+            drawMilestones(context: context, size: size)
             drawSeabed(context: context, size: size)
             drawBubbles(context: context, size: size)
             drawFish(context: context, size: size)
@@ -194,7 +195,9 @@ struct PlantCanvasView: View {
             // legible even on the small home-card canvas.
             let radius = fish.sizeRatio * min(size.width, size.height) * 0.62
             drawKawaiiFish(context: context, center: center, radius: radius,
-                           facingRight: fish.facingRight, hue: fish.bodyHue)
+                           facingRight: fish.facingRight, hue: fish.bodyHue,
+                           species: parameters.dna.fishSpecies,
+                           pattern: parameters.dna.fishPattern)
         }
     }
 
@@ -202,7 +205,35 @@ struct PlantCanvasView: View {
         let p = parameters.mascotPlacement
         let center = CGPoint(x: p.xRatio * size.width, y: p.yRatio * size.height)
         let radius = p.sizeRatio * min(size.width, size.height)
+        // DNA tint: the mood accent rotated by the user's permanent variant,
+        // so two study-heavy users get differently colored turtles.
+        let tintedHue = (parameters.mood.accentHue + parameters.dna.mascotHueShift)
+            .truncatingRemainder(dividingBy: 1)
         drawMascot(context: context, center: center, radius: radius,
-                   mascot: parameters.mascot, accentHue: parameters.mood.accentHue)
+                   mascot: parameters.mascot, accentHue: tintedHue)
+    }
+
+    // MARK: - Milestones
+
+    private func drawMilestones(context: GraphicsContext, size: CGSize) {
+        let m = min(size.width, size.height)
+        let floorY = size.height * 0.945
+        for mark in parameters.milestones {
+            let x = mark.xRatio * size.width
+            switch mark.kind {
+            case .coral:
+                drawCoral(context: context, base: CGPoint(x: x, y: floorY), scale: m * 0.10)
+            case .seaweed:
+                drawSeaweed(context: context, base: CGPoint(x: x, y: floorY), scale: m * 0.15, sway: sway)
+            case .shipwreck:
+                drawShipwreck(context: context, base: CGPoint(x: x, y: floorY), scale: m * 0.11)
+            case .lighthouse:
+                drawLighthouse(context: context, base: CGPoint(x: x, y: floorY), scale: m * 0.16)
+            case .whale:
+                drawWhale(context: context,
+                          center: CGPoint(x: x, y: size.height * 0.30),
+                          radius: m * 0.11, sway: sway)
+            }
+        }
     }
 }

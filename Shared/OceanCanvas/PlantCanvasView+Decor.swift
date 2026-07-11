@@ -10,15 +10,22 @@ extension PlantCanvasView {
 
     /// Round-bodied fish with a fan tail, top fin, big sparkle eye, smile and
     /// blush. Pastel tint; light belly so it reads soft instead of flat.
+    /// `species` (0..3) sets body proportions shared by the whole school and
+    /// `pattern` (0 plain / 1 stripes / 2 dots) the markings — both from the
+    /// user's permanent OceanDNA.
     func drawKawaiiFish(
         context: GraphicsContext, center: CGPoint, radius: Double,
-        facingRight: Bool, hue: Double
+        facingRight: Bool, hue: Double, species: Int = 0, pattern: Int = 0
     ) {
         let s: Double = facingRight ? 1 : -1
         let body = Color(hue: hue, saturation: 0.42, brightness: 0.96)
         let deep = Color(hue: hue, saturation: 0.52, brightness: 0.84)
-        let bodyW = radius * 1.15
-        let bodyH = radius * 0.92
+        // Species proportions: round / long / tall / chubby.
+        let (wMul, hMul): (Double, Double) = [
+            (1.15, 0.92), (1.50, 0.72), (0.95, 1.06), (1.25, 1.00),
+        ][species % 4]
+        let bodyW = radius * wMul
+        let bodyH = radius * hMul
 
         // Fan tail — two rounded lobes behind the body.
         let back = CGPoint(x: center.x - s * bodyW * 0.9, y: center.y)
@@ -48,16 +55,43 @@ extension PlantCanvasView {
         context.fill(fin, with: .color(deep))
 
         // Egg-round body + lighter belly.
-        context.fill(
-            Path(ellipseIn: CGRect(x: center.x - bodyW, y: center.y - bodyH,
-                                   width: bodyW * 2, height: bodyH * 2)),
-            with: .color(body)
-        )
+        let bodyRect = CGRect(x: center.x - bodyW, y: center.y - bodyH,
+                              width: bodyW * 2, height: bodyH * 2)
+        context.fill(Path(ellipseIn: bodyRect), with: .color(body))
         context.fill(
             Path(ellipseIn: CGRect(x: center.x - bodyW * 0.62, y: center.y + bodyH * 0.05,
                                    width: bodyW * 1.24, height: bodyH * 0.8)),
             with: .color(.white.opacity(0.35))
         )
+
+        // DNA markings, clipped to the body so they never spill out.
+        if pattern != 0 {
+            var inked = context
+            inked.clip(to: Path(ellipseIn: bodyRect))
+            if pattern == 1 {
+                // Two soft vertical stripes across the back.
+                for off in [-0.25, 0.2] {
+                    let sx = center.x + s * bodyW * off
+                    inked.fill(
+                        Path(roundedRect: CGRect(x: sx - bodyW * 0.09, y: center.y - bodyH,
+                                                 width: bodyW * 0.18, height: bodyH * 1.2),
+                             cornerRadius: bodyW * 0.09),
+                        with: .color(deep.opacity(0.55))
+                    )
+                }
+            } else {
+                // Three little dots on the upper back.
+                for (dx, dy) in [(-0.35, -0.45), (0.0, -0.6), (0.3, -0.4)] {
+                    let dr = bodyW * 0.10
+                    inked.fill(
+                        Path(ellipseIn: CGRect(x: center.x + s * bodyW * dx - dr,
+                                               y: center.y + bodyH * dy - dr,
+                                               width: dr * 2, height: dr * 2)),
+                        with: .color(deep.opacity(0.55))
+                    )
+                }
+            }
+        }
 
         // Face — one big sparkle eye + smile + blush on the facing side.
         let eyeC = CGPoint(x: center.x + s * bodyW * 0.42, y: center.y - bodyH * 0.18)

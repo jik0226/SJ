@@ -146,8 +146,57 @@ final class PlantFormulaTests: XCTestCase {
             seed: seed,
             nutrients: PlantNutrients(studyMinutes: 200, workoutMinutes: 100)
         )
-        // 11 base lines (wave count/amp/freq, fish, mood, mascot, bubbles,
-        // starfish, sky, bgHue, activity-order seed) + 1 line per wave layer.
-        XCTAssertEqual(lines.count, 11 + p.waves.count)
+        // 13 base lines (wave count/amp/freq, fish, mood, mascot, DNA,
+        // milestones, bubbles, starfish, sky, bgHue, activity-order seed)
+        // + 1 line per wave layer.
+        XCTAssertEqual(lines.count, 13 + p.waves.count)
+    }
+
+    // MARK: - Ocean DNA (permanent identity traits)
+
+    func testDNADeterministicAndInRange() {
+        let a = OceanDNA.derive(from: 0xDEAD_BEEF_CAFE)
+        let b = OceanDNA.derive(from: 0xDEAD_BEEF_CAFE)
+        XCTAssertEqual(a, b)
+        XCTAssertTrue((0..<8).contains(a.mascotVariant))
+        XCTAssertTrue((0..<4).contains(a.fishSpecies))
+        XCTAssertTrue((0..<3).contains(a.fishPattern))
+    }
+
+    func testDNAStableAcrossActivityOrderAndGrowth() {
+        // DNA is identity: same seed must give the same traits regardless of
+        // how much was studied or in what order (unlike placement, which the
+        // sequence hash intentionally shifts).
+        let s1 = ActivitySequence.hash(of: [ActivityEvent(kind: .study, minutes: 60)])
+        let s2 = ActivitySequence.hash(of: [ActivityEvent(kind: .workout, minutes: 90)])
+        let a = PlantFormula.parameters(
+            seed: 424_242, nutrients: PlantNutrients(studyMinutes: 10, workoutMinutes: 0, sequenceHash: s1)
+        )
+        let b = PlantFormula.parameters(
+            seed: 424_242, nutrients: PlantNutrients(studyMinutes: 9_999, workoutMinutes: 500, sequenceHash: s2)
+        )
+        XCTAssertEqual(a.dna, b.dna)
+    }
+
+    // MARK: - Milestones (shared unlock rules)
+
+    func testMilestoneThresholds() {
+        XCTAssertEqual(MilestoneKind.unlocked(totalMinutes: 599), [])
+        XCTAssertEqual(MilestoneKind.unlocked(totalMinutes: 600), [.coral])
+        XCTAssertEqual(
+            MilestoneKind.unlocked(totalMinutes: 18_000),
+            [.coral, .seaweed, .shipwreck, .lighthouse, .whale]
+        )
+    }
+
+    func testMilestonesAppearInParameters() {
+        let p = PlantFormula.parameters(
+            seed: seed,
+            nutrients: PlantNutrients(studyMinutes: 1_500, workoutMinutes: 0)
+        )
+        XCTAssertEqual(p.milestones.map(\.kind), [.coral, .seaweed])
+        for mark in p.milestones {
+            XCTAssertTrue((0.0...1.0).contains(mark.xRatio))
+        }
     }
 }

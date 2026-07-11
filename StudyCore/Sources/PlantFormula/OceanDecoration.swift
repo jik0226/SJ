@@ -105,6 +105,83 @@ public enum SkyToken: String, Equatable, Sendable {
     }
 }
 
+// MARK: - Ocean DNA
+
+/// Permanent per-user appearance traits derived from the RAW seed (before the
+/// activity-order XOR), so they never change as the user studies — this is the
+/// ocean's identity: "my turtle is mint, my fish are chubby with stripes".
+/// Purely derived → the shared-ocean payload needs no new fields.
+public struct OceanDNA: Equatable, Sendable {
+    /// 0..7 mascot color variant. Applied as a hue offset to the mood accent.
+    public let mascotVariant: Int
+    /// 0..3 fish body shape shared by the whole school (round/long/tall/chubby).
+    public let fishSpecies: Int
+    /// 0..2 fish pattern: 0 = plain, 1 = stripes, 2 = dots.
+    public let fishPattern: Int
+
+    /// Evenly spaced around the color wheel; pastel saturation in the
+    /// renderer keeps even the wild hues cute.
+    public var mascotHueShift: Double { Double(mascotVariant) * 0.125 }
+
+    /// Independent bit windows of the seed so traits don't correlate.
+    public static func derive(from seed: UInt64) -> OceanDNA {
+        OceanDNA(
+            mascotVariant: Int((seed >> 3) % 8),
+            fishSpecies: Int((seed >> 11) % 4),
+            fishPattern: Int((seed >> 17) % 3)
+        )
+    }
+}
+
+// MARK: - Milestones
+
+/// Long-term decorations unlocked by TOTAL accumulated minutes. Thresholds
+/// are shared rules (not seed-dependent) so "내 바다에 등대 떴어" is a
+/// comparable brag; only the placement varies per user.
+public enum MilestoneKind: String, CaseIterable, Equatable, Sendable {
+    case coral       // 10 hours
+    case seaweed     // 25 hours
+    case shipwreck   // 50 hours
+    case lighthouse  // 100 hours
+    case whale       // 300 hours
+
+    public var thresholdMinutes: Int {
+        switch self {
+        case .coral:      return 600
+        case .seaweed:    return 1_500
+        case .shipwreck:  return 3_000
+        case .lighthouse: return 6_000
+        case .whale:      return 18_000
+        }
+    }
+
+    public var koreanName: String {
+        switch self {
+        case .coral:      return "산호"
+        case .seaweed:    return "해초"
+        case .shipwreck:  return "난파선"
+        case .lighthouse: return "등대"
+        case .whale:      return "고래"
+        }
+    }
+
+    public static func unlocked(totalMinutes: Int) -> [MilestoneKind] {
+        allCases.filter { totalMinutes >= $0.thresholdMinutes }
+    }
+}
+
+/// One placed milestone decoration (x position is seed-derived).
+public struct MilestoneMark: Equatable, Sendable {
+    public let kind: MilestoneKind
+    /// Horizontal position 0..1.
+    public let xRatio: Double
+
+    public init(kind: MilestoneKind, xRatio: Double) {
+        self.kind = kind
+        self.xRatio = xRatio
+    }
+}
+
 // MARK: - Decoration marks
 
 /// A rising bubble — count driven by workout minutes (energy).
