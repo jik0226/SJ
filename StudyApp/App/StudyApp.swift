@@ -17,6 +17,13 @@ struct StudyApp: App {
     @State private var onboardingComplete: Bool =
         UserDefaults.standard.bool(forKey: "onboarding.complete")
         || ProcessInfo.processInfo.arguments.contains("--seed-demo")
+    // One-time post-onboarding walkthrough. Only ever shown to a fresh
+    // install — see the backfill logic in init() for existing users.
+    // No inline default here: it must be assigned inside init(), after the
+    // backfill runs, since Swift applies property default-value expressions
+    // before the init() body executes (which would otherwise read the
+    // UserDefaults key before the backfill has a chance to set it).
+    @State private var tutorialComplete: Bool
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -30,19 +37,37 @@ struct StudyApp: App {
         } else {
             ServerMode.shared.reportOffline(reason: "Firebase 설정 파일이 없어요. 로컬 모드로 실행됩니다.")
         }
+
+        // Backfill: users who already completed onboarding before this
+        // tutorial existed must never see it retroactively on update. Mark
+        // it complete for them so only fresh installs go through it.
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "onboarding.complete"),
+           defaults.object(forKey: "tutorial.complete") == nil {
+            defaults.set(true, forKey: "tutorial.complete")
+        }
+        _tutorialComplete = State(initialValue:
+            defaults.bool(forKey: "tutorial.complete")
+            || ProcessInfo.processInfo.arguments.contains("--seed-demo")
+        )
     }
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if onboardingComplete {
-                    RootView()
-                        .environment(appState)
-                } else {
+                if !onboardingComplete {
                     AgeOnboardingView {
                         onboardingComplete = true
                     }
                     .environment(appState)
+                } else if !tutorialComplete {
+                    TutorialView {
+                        tutorialComplete = true
+                    }
+                    .environment(appState)
+                } else {
+                    RootView()
+                        .environment(appState)
                 }
             }
             .preferredColorScheme(.light)
