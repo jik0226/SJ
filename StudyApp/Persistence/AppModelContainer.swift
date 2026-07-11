@@ -137,45 +137,19 @@ enum AppModelContainer {
     private static func seedIfNeeded(container: ModelContainer) {
         let context = ModelContext(container)
 
-        seedSubjects(context: context)
-        seedDDay(context: context)
+        // Only the plant (the ocean — the app's identity) is pre-seeded.
+        // Subjects and D-Days intentionally start EMPTY: placeholder content
+        // ("수학", "수능") made a fresh install feel like someone else's app.
+        // The timer hub and home card both have proper empty states with
+        // create CTAs, and the tutorial walks new users through them.
         seedPlant(context: context)
         migratePlantName(context: context)
 
         Persistence.save({ try context.save() }, context: "seed")
 
-        // Push the seed D-Day + today's (zero) study time into the App Group
-        // so widgets render real data on first install, not the placeholder.
+        // Push today's (zero) study time into the App Group so widgets render
+        // real data on first install, not the placeholder.
         WidgetSyncService.syncAll(context: context)
-    }
-
-    private static func seedSubjects(context: ModelContext) {
-        let existing = (try? context.fetch(FetchDescriptor<SubjectModel>())) ?? []
-        guard existing.isEmpty else { return }
-
-        let seeds: [SubjectModel] = [
-            SubjectModel(name: "수학", colorHex: "#4DABF7", sfSymbol: "function",
-                         allowPhoneUse: false, category: .study, dailyTargetMinutes: 120),
-            SubjectModel(name: "영어", colorHex: "#FF6B6B", sfSymbol: "character.book.closed",
-                         allowPhoneUse: false, category: .study, dailyTargetMinutes: 60),
-            SubjectModel(name: "프로그래밍 강의", colorHex: "#B197FC", sfSymbol: "laptopcomputer",
-                         allowPhoneUse: true, category: .study, dailyTargetMinutes: 90),
-            SubjectModel(name: "러닝", colorHex: "#20C997", sfSymbol: "figure.run",
-                         allowPhoneUse: true, category: .workout, dailyTargetMinutes: 30,
-                         workoutType: .running),
-        ]
-        seeds.forEach(context.insert)
-    }
-
-    private static func seedDDay(context: ModelContext) {
-        let existing = (try? context.fetch(FetchDescriptor<DDayModel>())) ?? []
-        guard existing.isEmpty else { return }
-
-        let calendar = Calendar.current
-        let suneungDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 19))
-                          ?? Date().addingTimeInterval(60 * 60 * 24 * 180)
-        context.insert(DDayModel(title: "수능", targetDate: suneungDate,
-                                 emoji: "📚", isPinned: true))
     }
 
     private static func seedPlant(context: ModelContext) {

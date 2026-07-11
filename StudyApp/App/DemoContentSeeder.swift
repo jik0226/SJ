@@ -28,9 +28,11 @@ enum DemoContentSeeder {
         let me = SocialService.me(in: context)
         if me.nickname.isEmpty { me.nickname = "수험생 J" }
 
-        let subjects = (try? context.fetch(FetchDescriptor<SubjectModel>())) ?? []
-        let study = subjects.filter { $0.categoryRaw == SubjectCategory.study.rawValue }
-        guard !study.isEmpty else { return }  // defaults not ready yet; retry next launch
+        // Production installs start with zero subjects/D-Days by design, so
+        // the demo creates its own showcase set here.
+        let study = seedDemoSubjects(context: context)
+        seedDemoDDay(context: context)
+        guard !study.isEmpty else { return }
 
         seedSessions(study: study, today: today, context: context)
         seedPlanner(study: study, today: today, context: context)
@@ -38,6 +40,33 @@ enum DemoContentSeeder {
 
         Persistence.save({ try context.save() }, context: "demo.seedContent")
         UserDefaults.standard.set(true, forKey: seededKey)
+    }
+
+    /// Demo showcase subjects — production no longer pre-seeds any.
+    private static func seedDemoSubjects(context: ModelContext) -> [SubjectModel] {
+        let existing = (try? context.fetch(FetchDescriptor<SubjectModel>())) ?? []
+        let existingStudy = existing.filter { $0.categoryRaw == SubjectCategory.study.rawValue }
+        guard existingStudy.isEmpty else { return existingStudy }
+        let seeds: [SubjectModel] = [
+            SubjectModel(name: "수학", colorHex: "#4DABF7", sfSymbol: "function",
+                         allowPhoneUse: false, category: .study, dailyTargetMinutes: 120),
+            SubjectModel(name: "영어", colorHex: "#FF6B6B", sfSymbol: "character.book.closed",
+                         allowPhoneUse: false, category: .study, dailyTargetMinutes: 60),
+            SubjectModel(name: "국어", colorHex: "#51CF66", sfSymbol: "book",
+                         allowPhoneUse: false, category: .study, dailyTargetMinutes: 90),
+            SubjectModel(name: "러닝", colorHex: "#20C997", sfSymbol: "figure.run",
+                         allowPhoneUse: true, category: .workout, dailyTargetMinutes: 30,
+                         workoutType: .running),
+        ]
+        seeds.forEach(context.insert)
+        return seeds.filter { $0.categoryRaw == SubjectCategory.study.rawValue }
+    }
+
+    private static func seedDemoDDay(context: ModelContext) {
+        let existing = (try? context.fetch(FetchDescriptor<DDayModel>())) ?? []
+        guard existing.isEmpty else { return }
+        let target = Calendar.current.date(byAdding: .day, value: 131, to: Date()) ?? Date()
+        context.insert(DDayModel(title: "수능", targetDate: target, emoji: "📚", isPinned: true))
     }
 
     private static func seedSessions(study: [SubjectModel], today: Int, context: ModelContext) {
