@@ -18,6 +18,11 @@ struct OceanMoment: Identifiable {
     /// how exciting the change is; the sheet shows at most two.
     var changeCallouts: [String] {
         var lines: [String] = []
+        // Milestone unlocks are the biggest news — announce them first.
+        let beforeKinds = Set(before.milestones.map(\.kind))
+        for mark in after.milestones where !beforeKinds.contains(mark.kind) {
+            lines.append(mark.kind.celebrationText)
+        }
         if before.mascot != after.mascot {
             lines.append("새 친구 \(after.mascot.koreanName)\(after.mascot.emoji)가 찾아왔어요!")
         }
@@ -37,22 +42,8 @@ struct OceanMoment: Identifiable {
     }
 }
 
-extension OceanMascot {
-    var koreanName: String {
-        switch self {
-            case .turtle: return "거북이"
-            case .octopus: return "문어"
-            case .crab: return "게"
-        }
-    }
-    var emoji: String {
-        switch self {
-            case .turtle: return "🐢"
-            case .octopus: return "🐙"
-            case .crab: return "🦀"
-        }
-    }
-}
+// OceanMascot.koreanName/emoji live in StudyCore (OceanDecoration.swift) so
+// the share card and formula sheet can use the same wording.
 
 @MainActor
 @Observable

@@ -20,17 +20,23 @@ struct OceanShareCard: View {
                 .frame(width: 360, height: 330)
                 .clipped()
 
-            VStack(spacing: 6) {
+            VStack(spacing: 5) {
                 Text(name)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                // Speakable DNA identity — the line that makes the share say
+                // "this exact sea is mine".
+                Text(parameters.dna.summary(mascot: parameters.mascot,
+                                            accentHue: parameters.mood.accentHue))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9))
                 Text("공부 \(format(studyMinutes)) · 운동 \(format(workoutMinutes))")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
                 Text("Study J — 공부로 자라는 나의 바다")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
-                    .padding(.top, 6)
+                    .padding(.top, 4)
             }
             .frame(width: 360, height: 120)
             .background(Color(hue: parameters.mood.bottomHue, saturation: 0.70, brightness: 0.22))

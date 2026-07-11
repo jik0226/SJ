@@ -83,6 +83,22 @@ public enum OceanMascot: String, Equatable, Sendable {
         default:           return .crab
         }
     }
+
+    public var koreanName: String {
+        switch self {
+        case .turtle: return "거북이"
+        case .octopus: return "문어"
+        case .crab: return "게"
+        }
+    }
+
+    public var emoji: String {
+        switch self {
+        case .turtle: return "🐢"
+        case .octopus: return "🐙"
+        case .crab: return "🦀"
+        }
+    }
 }
 
 // MARK: - Sky token
@@ -131,6 +147,41 @@ public struct OceanDNA: Equatable, Sendable {
             fishPattern: Int((seed >> 17) % 3)
         )
     }
+
+    /// Friendly Korean species name — identity must be speakable ("통통이").
+    public var speciesName: String {
+        ["둥글이", "길쭉이", "볼록이", "통통이"][fishSpecies % 4]
+    }
+
+    public var patternName: String {
+        ["민무늬", "줄무늬", "점박이"][fishPattern % 3]
+    }
+
+    /// One-line speakable identity, e.g. "민트 거북이 · 줄무늬 통통이".
+    /// `accentHue` is the mood accent so the color name matches what's on
+    /// screen (the same variant shifts different base hues).
+    public func summary(mascot: OceanMascot, accentHue: Double) -> String {
+        let tinted = (accentHue + mascotHueShift).truncatingRemainder(dividingBy: 1)
+        return "\(OceanHueName.name(forHue: tinted)) \(mascot.koreanName) · \(patternName) \(speciesName)"
+    }
+}
+
+/// Buckets an HSB hue (0..1) into a friendly Korean color name.
+public enum OceanHueName {
+    public static func name(forHue hue: Double) -> String {
+        let h = (hue.truncatingRemainder(dividingBy: 1) + 1).truncatingRemainder(dividingBy: 1)
+        switch h {
+        case ..<0.045:      return "코랄"
+        case 0.045..<0.11:  return "주황"
+        case 0.11..<0.19:   return "레몬"
+        case 0.19..<0.40:   return "연두"
+        case 0.40..<0.52:   return "민트"
+        case 0.52..<0.62:   return "하늘"
+        case 0.62..<0.80:   return "라벤더"
+        case 0.80..<0.93:   return "핑크"
+        default:            return "코랄"
+        }
+    }
 }
 
 // MARK: - Milestones
@@ -162,6 +213,18 @@ public enum MilestoneKind: String, CaseIterable, Equatable, Sendable {
         case .shipwreck:  return "난파선"
         case .lighthouse: return "등대"
         case .whale:      return "고래"
+        }
+    }
+
+    /// Celebration line for the session-end moment sheet when this milestone
+    /// first appears (grammar-correct particles per word).
+    public var celebrationText: String {
+        switch self {
+        case .coral:      return "🪸 산호가 자라났어요!"
+        case .seaweed:    return "🌿 해초가 자라났어요!"
+        case .shipwreck:  return "⚓ 난파선이 나타났어요!"
+        case .lighthouse: return "🗼 등대가 세워졌어요!"
+        case .whale:      return "🐋 고래가 찾아왔어요!"
         }
     }
 

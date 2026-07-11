@@ -31,7 +31,7 @@ extension PlantFormula {
                   value: p.mascot.rawValue),
             .init(label: "바다 DNA",
                   formula: "씨앗 비트 → 마스코트 색 8종 × 물고기 체형 4종 × 무늬 3종",
-                  value: "색\(p.dna.mascotVariant)·형\(p.dna.fishSpecies)·무늬\(p.dna.fishPattern)"),
+                  value: p.dna.summary(mascot: p.mascot, accentHue: p.mood.accentHue)),
             .init(label: "장식 (마일스톤)",
                   formula: "누적 10h 산호 → 25h 해초 → 50h 난파선 → 100h 등대 → 300h 고래",
                   value: p.milestones.map(\.kind.koreanName).joined(separator: "·").isEmpty

@@ -27,8 +27,10 @@ enum PlantProgressService {
         let minutes = run.totalActiveSeconds / 60
         guard minutes > 0 else { return }
         guard let plant = ensurePlant(context: context) else { return }
+        let before = plant.parameters
         plant.addWorkoutMinutes(minutes)
         Persistence.save({ try context.save() }, context: "plant.workoutNutrient")
+        publishMoment(before: before, plant: plant, minutes: minutes, kind: .workout)
         WidgetSyncService.syncPlant(context: context)
         WidgetCenter.shared.reloadAllTimelines()
         FirestoreSyncService.shared.publishPlant(plant)

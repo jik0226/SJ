@@ -189,6 +189,26 @@ final class PlantFormulaTests: XCTestCase {
         )
     }
 
+    func testDNASummaryIsSpeakable() {
+        // The identity line must be human words, not raw indices.
+        let dna = OceanDNA.derive(from: 0xABCDEF)
+        let summary = dna.summary(mascot: .turtle, accentHue: 0.45)
+        XCTAssertTrue(summary.contains("거북이"))
+        XCTAssertFalse(summary.contains("색"), "raw index labels must not leak")
+        XCTAssertTrue(["민무늬", "줄무늬", "점박이"].contains(dna.patternName))
+        XCTAssertTrue(["둥글이", "길쭉이", "볼록이", "통통이"].contains(dna.speciesName))
+    }
+
+    func testHueNameCoversWholeWheel() {
+        // Every hue bucket resolves to a non-empty Korean name; wrap-around
+        // (hue > 1) and negative inputs normalize instead of crashing.
+        for h in stride(from: -0.2, through: 1.4, by: 0.05) {
+            XCTAssertFalse(OceanHueName.name(forHue: h).isEmpty)
+        }
+        XCTAssertEqual(OceanHueName.name(forHue: 0.45), "민트")
+        XCTAssertEqual(OceanHueName.name(forHue: 0.70), "라벤더")
+    }
+
     func testMilestonesAppearInParameters() {
         let p = PlantFormula.parameters(
             seed: seed,
