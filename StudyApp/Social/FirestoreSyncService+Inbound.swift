@@ -15,47 +15,54 @@ extension FirestoreSyncService {
     /// Pulls the user's private subtree from Firestore and mirrors anything
     /// missing into local SwiftData. Existing rows are NOT overwritten —
     /// local changes win until a proper updatedAt-based merge is built.
+    ///
+    /// Runs ONCE per (install, uid) — this is a RESTORE path for fresh
+    /// installs / account re-links, not a live sync. Running it on every
+    /// launch resurrected locally deleted rows (D-Days most visibly) whenever
+    /// the fire-and-forget server delete hadn't landed (offline, app killed).
+    /// The per-uid key means account deletion → new anon uid re-restores.
     func pullPrivateSnapshot(into context: ModelContext) async {
-        guard uid != nil, let userRef = userRef() else { return }
-        await pullCollection(
-            ref: userRef.collection("private").document("subjects").collection("items"),
-            context: context, hydrate: hydrateSubject(_:context:)
-        )
-        await pullCollection(
-            ref: userRef.collection("private").document("ddays").collection("items"),
-            context: context, hydrate: hydrateDDay(_:context:)
-        )
-        await pullCollection(
-            ref: userRef.collection("private").document("planner").collection("items"),
-            context: context, hydrate: hydratePlannerBlock(_:context:)
-        )
-        await pullCollection(
-            ref: userRef.collection("private").document("sessions").collection("items"),
-            context: context, hydrate: hydrateSession(_:context:)
-        )
-        await pullCollection(
-            ref: userRef.collection("private").document("runs").collection("items"),
-            context: context, hydrate: hydrateRun(_:context:)
-        )
-        await pullCollection(
-            ref: userRef.collection("private").document("plant").collection("items"),
-            context: context, hydrate: hydratePlant(_:context:)
-        )
+        guard let uid, let userRef = userRef() else { return }
+        let hydratedKey = "private.hydrated.\(uid)"
+        guard !UserDefaults.standard.bool(forKey: hydratedKey) else { return }
+
+        var allSucceeded = true
+        func pull(_ collection: String, _ hydrate: @escaping ([String: Any], ModelContext) -> Void) async {
+            let ok = await pullCollection(
+                ref: userRef.collection("private").document(collection).collection("items"),
+                context: context, hydrate: hydrate
+            )
+            allSucceeded = allSucceeded && ok
+        }
+        await pull("subjects", hydrateSubject(_:context:))
+        await pull("ddays", hydrateDDay(_:context:))
+        await pull("planner", hydratePlannerBlock(_:context:))
+        await pull("sessions", hydrateSession(_:context:))
+        await pull("runs", hydrateRun(_:context:))
+        await pull("plant", hydratePlant(_:context:))
         Persistence.save({ try context.save() }, context: "firestore.pullPrivate")
+
+        // Only mark hydrated when every collection fetched cleanly — a first
+        // launch in airplane mode must still get its restore on the next run.
+        if allSucceeded {
+            UserDefaults.standard.set(true, forKey: hydratedKey)
+        }
     }
 
     private func pullCollection(
         ref: CollectionReference,
         context: ModelContext,
         hydrate: ([String: Any], ModelContext) -> Void
-    ) async {
+    ) async -> Bool {
         do {
             let snap = try await ref.getDocuments()
             for doc in snap.documents {
                 hydrate(doc.data(), context)
             }
+            return true
         } catch {
             Persistence.log(error, context: "firestore.pull.\(ref.path)")
+            return false
         }
     }
 
